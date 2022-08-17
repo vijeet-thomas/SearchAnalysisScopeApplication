@@ -1,0 +1,112 @@
+﻿//Script GUID:27cfe48d-0fea-4449-880d-42a6b3dfef76
+//Used for tracking history
+
+//Script GUID:8fb7ac04-3531-451d-ab99-f1f5c455a4cd
+//Used for tracking history
+
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module"; 
+
+REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Microsoft.Telemetry.Cosmos.Application.dll";
+REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Device/Microsoft.Telemetry.Common.Utilities.dll";
+
+USING Microsoft.Telemetry.Cosmos.Application;
+USING Microsoft.Telemetry.Common.Utilities;
+MODULE "/shares/asimov.prod.data/Public/Resources/Latest/Dimensions/CommonDimensions.module" AS CommonDimensions;
+
+
+#DECLARE madData string = @"/users/vijeetthomas/AppUsage/AppMonikerUsageByProductId.ss";
+#DECLARE winData string = @"/users/vijeetthomas/AppUsage/AppWinUsageByProductId.ss";
+#DECLARE allData string = @"users/vijeetthomas/RelevanceScore/2022/03/AggregatedScore_2022_03_19.ss";
+#DECLARE appmoniker string = @"/shares/asimov.prod.data/Public/Processed/Common/Dimensions/Application/AppMonikerProductIdDictionary.ss";
+
+#DECLARE dimAppView string = @"/shares/asimov.prod.data/Public/Processed/Common/Dimensions/DimApp/DimApp.view"; 
+#DECLARE dimAppViewVersion string = "V9";
+
+dimApp =
+    VIEW @dimAppView
+    PARAMS
+    (
+        version = @dimAppViewVersion
+    );
+
+dimAppFiltered =
+    SELECT AppMoniker,
+           AppId,
+           OneStoreProductId AS ProductId
+    FROM dimApp
+    WHERE AppName != "" 
+          AND PublisherType != ""
+          AND AppType == "Modern";
+
+moniker =
+    SELECT *
+    FROM
+    (
+        SSTREAM @appmoniker
+    );
+
+data1 =
+    SELECT *
+    FROM
+    (
+        SSTREAM @madData
+    );
+
+
+data2 =
+    SELECT *
+    FROM
+    (
+        SSTREAM @allData
+    )
+    WHERE Market == "US";
+
+data3 =
+    SELECT *
+    FROM
+    (
+        SSTREAM @winData
+    );
+
+countdata1 =
+    SELECT COUNT(DISTINCT AppProductId) AS CountOfMadProducts,
+           COUNT (DISTINCT AppMoniker) AS CountOfMadMonikers
+    FROM data1;
+
+countdata2 = 
+    SELECT COUNT(DISTINCT ProductId) AS CountOfAllProducts
+    FROM data2;
+
+countdata3 = 
+    SELECT COUNT(DISTINCT ProductId) AS CountOfMtv
+    FROM data2
+    WHERE !string.IsNullOrEmpty(ProductTypeName)
+          AND ProductTypeName.Equals("TV Series") || ProductTypeName.Equals("Movie");
+
+countdata4 = 
+    SELECT COUNT(DISTINCT ProductId) AS CountOfDimAppProducts,
+           COUNT(DISTINCT AppMoniker) AS CountOfAppMoniker
+    FROM dimAppFiltered;
+
+
+countdata6 =
+    SELECT COUNT(DISTINCT WinProductId) AS CountOfWinProducts,
+           COUNT (DISTINCT AppMoniker) AS CountOfWinMonikers
+    FROM data3;
+
+comp =
+    SELECT *
+    FROM countdata1
+         CROSS JOIN
+             countdata2
+         CROSS JOIN
+             countdata3
+        CROSS  JOIN
+            countdata4
+        CROSS JOIN 
+            countdata6;
+
+OUTPUT comp TO SSTREAM @"/users/vijeetthomas/AppUsage/AppDistribution.ss";

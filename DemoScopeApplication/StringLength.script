@@ -1,0 +1,22 @@
+﻿//Script GUID:13aea2cf-eac7-4395-9e44-c69314697e4a
+//Used for tracking history
+
+
+#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/06/AggregatedScore_2022_06_18.ss";
+#DECLARE outputStream string = @"/users/vijeetthomas/stringLengthOutput.ss";
+
+input = SELECT ProductId, getStringLength(ProductId)  AS StringLength FROM (SSTREAM @inputStream);
+
+OUTPUT input TO SSTREAM @outputStream WITH STREAMEXPIRY "1";
+
+
+#CS
+    
+    public static int getStringLength (string name) {
+        if (name != null) {
+            return name.Length;
+        }
+        return 0;
+    }
+    
+#ENDCS

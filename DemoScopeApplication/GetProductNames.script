@@ -1,0 +1,40 @@
+﻿//Script GUID:1fc082ee-de53-4f07-b2ae-3dea87521f3a
+//Used for tracking history
+
+
+// Date Parameters
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+
+#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/2022/07/AndroidRatings_2022_07_14.ss";
+#DECLARE outputStream string = @"/users/vijeetthomas/RelevanceScore/AndroidRatings/2022/07/AndroidRatings_2022_07_14.ss";
+#DECLARE streamExpiryString string = "180";
+#DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+
+input =
+SELECT *
+FROM
+(
+    SSTREAM @inputStream
+);
+
+
+productNames =
+SELECT *
+FROM
+(
+    SSTREAM @productNameMapper
+);
+
+output = 
+    SELECT a.*, b.ProductName
+    FROM input AS a 
+         INNER JOIN productNames AS b
+         ON a.ProductId == b.ProductId
+    WHERE a.ProductId IS NOT NULL;
+
+
+OUTPUT output
+TO SSTREAM @outputStream
+CLUSTERED BY ProductId
+SORTED BY ProductId
+WITH STREAMEXPIRY @streamExpiryString;

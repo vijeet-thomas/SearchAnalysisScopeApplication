@@ -1,0 +1,138 @@
+﻿//Script GUID:3f168c6e-e31a-49ce-8836-38d7ad58158f
+//Used for tracking history
+
+#IF("@@endDate@@".StartsWith("@@"))
+    #DECLARE ReportEndDate DateTime = DateTime.UtcNow.AddDays( - 2);
+#ELSE
+    #DECLARE ReportEndDate DateTime = DateTime.Parse("@@endDate@@");
+#ENDIF
+
+#DECLARE NumberOfDays int = 365;
+
+#IF("@@startDate@@".StartsWith("@@"))
+    #DECLARE ReportStartDate DateTime = @ReportEndDate.AddDays( - @NumberOfDays + 1);
+#ELSE
+    #DECLARE ReportStartDate DateTime = DateTime.Parse("@@startDate@@");
+#ENDIF
+
+
+// --------------------------------------------------------------------------------------------------------------------
+// Modules & References
+// --------------------------------------------------------------------------------------------------------------------
+// NGP Tagging Module
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Census/Microsoft.Telemetry.Device.Census.dll";
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Common/Microsoft.Telemetry.Common.Utilities.dll";
+
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module";
+MODULE "/shares/asimov.prod.data/Public/Resources/Latest/Dimensions/CommonDimensions.module" AS CommonDimensions;
+
+//----------------------------------------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------------------------------------
+//Input data sets
+
+#DECLARE win32Apps string = @"shares/asimov.prod.data/Public/Processed/Device/Inventory/V5/Flattened/InventoryApplication.ss";
+
+//----------------------------------------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------------------------------------
+//Query
+programs =
+    SELECT DeviceId,
+           Name AS ProgramName,
+           Source, 
+           HiddenArp, 
+           Name, 
+           Key,
+           Publisher AS ProgramPublisher,
+           GetDateValue(InstallDate) AS ProgramInstallDate
+    FROM
+    (
+        SSTREAM @win32Apps
+    )
+;
+
+//[PARTITION = (PARTITIONCOUNT = 10000)]
+programs = 
+SELECT *, 
+       DimensionKeys.GetWin32AppProgramKey(Key) AS AppProgramKey
+    FROM programs
+              WHERE 1==1 
+              AND (ProgramInstallDate >= @ReportStartDate) && (ProgramInstallDate <= @ReportEndDate)
+              AND Source == "Msi"
+              AND HiddenArp == "false"
+              AND !string.IsNullOrEmpty(Name)
+          AND !string.IsNullOrEmpty(Key)
+          AND ProgramInstallDate != DateTime.MinValue
+          AND ProgramInstallDate.Year != 9999
+          AND DimensionKeys.GetWin32AppProgramKey(Key) IS NOT NULL
+;
+
+OUTPUT programs
+TO SSTREAM @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/ProgramData2.ss"
+WITH STREAMEXPIRY "30";
+
+#CS
+   
+    public static DateTime GetDateValue(string dateString)
+    {
+        // Convert a null string.  
+        DateTime dateTimeValue = new DateTime();  
+        bool isSuccess = false;
+
+ 
+
+        try
+        {
+            isSuccess = DateTime.TryParse(dateString, out dateTimeValue);
+
+ 
+
+        }
+        catch( Exception ex )
+        {
+      
+        }
+
+ 
+
+        return dateTimeValue;
+    }
+
+ 
+
+    public static string SanitizeString(string stringValue)
+    {
+        string returnValue = string.Empty;
+
+ 
+
+        try
+        {
+            returnValue = stringValue.Trim().ToLower();
+        }
+        catch( Exception ex )
+        {
+      
+        }
+
+ 
+
+        return returnValue;
+    }
+
+ 
+
+    public static DateTime GetMonthEndDate(DateTime dateValue)
+    {
+        DateTime returnValue = new DateTime(dateValue.AddMonths( - 1).Year, dateValue.AddMonths( - 1).Month, 1);
+
+ 
+
+        return returnValue.AddMonths(1).AddDays( - 1);
+    }
+
+ 
+
+#ENDCS

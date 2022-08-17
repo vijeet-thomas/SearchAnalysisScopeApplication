@@ -1,0 +1,43 @@
+﻿//Script GUID:6fac708f-5287-48df-846e-bfa7c8675106
+//Used for tracking history
+
+// Output
+#DECLARE inputStream string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_08.ss";
+#DECLARE streamExpiryString string = "30";
+
+inputData =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputStream
+    )
+    WHERE Market == "US";
+
+dataDistribution =
+    SELECT ProductId,
+           ScorePopularity == 0 ? 1 : 0 AS E0,
+           ScorePopularity <= 100 ? 1 : 0 AS L100,
+           ScorePopularity > 100 AND ScorePopularity <= 500 ? 1 : 0 AS L500,
+           ScorePopularity > 500 AND ScorePopularity <= 1000 ? 1 : 0 AS L1K,
+           ScorePopularity > 1000 AND ScorePopularity <= 10000 ? 1 : 0 AS L10K,
+           ScorePopularity > 10000 AND ScorePopularity <= 100000 ? 1 : 0 AS L100K,
+           ScorePopularity > 100000 AND ScorePopularity <= 1000000 ? 1 : 0 AS L1M,
+           ScorePopularity > 1000000? 1 : 0 AS G1M,
+           ScorePopularity >= 0 ? 1 : 0 AS TotalCount
+    FROM inputData;
+
+dataDistribution =
+    SELECT SUM(E0) AS E0,
+           SUM(L100) AS L100,
+           SUM(L500) AS L500,
+           SUM(L1K) AS L1K,
+           SUM(L10K) AS L10K,
+           SUM(L100K) AS L100K,
+           SUM(L1M) AS L1M,
+           SUM(G1M) AS G1M,
+           SUM(TotalCount) AS TotalCount
+    FROM dataDistribution;
+
+OUTPUT dataDistribution TO SSTREAM @"/users/vijeetthomas/search/Analysis/ScorePopularityAnalysis.ss"
+WITH STREAMEXPIRY "30";
+

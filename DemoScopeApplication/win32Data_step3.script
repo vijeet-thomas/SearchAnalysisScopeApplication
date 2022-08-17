@@ -1,0 +1,110 @@
+﻿ //Script GUID:1cd993da-6630-4223-a726-905583eafa8e
+//Used for tracking history
+
+// --------------------------------------------------------------------------------------------------------------------
+// Modules & References
+// --------------------------------------------------------------------------------------------------------------------
+// NGP Tagging Module
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Census/Microsoft.Telemetry.Device.Census.dll";
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Common/Microsoft.Telemetry.Common.Utilities.dll";
+
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module";
+
+//----------------------------------------------------------------------------------------------------------------------------------------------------
+
+#DECLARE win32Data_bySkuCountry string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/ProgramInstallsData.ss";
+#DECLARE storeIdData string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreAnalytics/Installs/StoreSpark_ProductIdARPMapping.ss";
+#DECLARE storeIDMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreAnalytics/Launches/SparkProductIdToAppMonikerMapping.ss";
+
+installsBySkuCountry =
+    SELECT IF(!string.IsNullOrEmpty(ProgramName), ProgramName.Replace(",", "_"), ProgramName).Trim().ToLower() AS ProgramName,
+           OSSkuGroupName,
+           Market,
+           Key,
+           InstallCount
+    FROM
+    (
+        SSTREAM @win32Data_bySkuCountry
+    )
+    WHERE OSSkuGroupName IN("Education", "Pro", "Home", "ProWorkstation", "Home Premium");
+
+
+storeInstalls = 
+    SELECT ARPName.Trim().ToLower() AS ARPName,
+            CvJson_storeId AS ProductId,
+            ARPPublisher
+    FROM (SSTREAM @storeIdData);
+
+storeMapper =
+    SELECT *
+    FROM
+    (
+        SSTREAM @storeIDMapper
+    );
+
+installStoreMapByKey = 
+    SELECT storeMapper.ProductId,
+           installsBySkuCountry.Market,
+           installsBySkuCountry.ProgramName,
+           SUM(installsBySkuCountry.InstallCount) AS InstallCount
+    FROM installsBySkuCountry INNER JOIN 
+         storeMapper
+    ON installsBySkuCountry.Key == storeMapper.Key
+    GROUP BY ProductId,Market,ProgramName
+    ;
+
+installTop =
+    SELECT TOP 10000 *
+    FROM installStoreMapByKey
+    ORDER BY InstallCount DESC
+    ;
+
+installsForProductId =
+    SELECT storeInstalls.ProductId,
+           installsBySkuCountry.Market,
+           installsBySkuCountry.ProgramName,
+           SUM(installsBySkuCountry.InstallCount) AS InstallCount
+    FROM installsBySkuCountry INNER JOIN 
+         storeInstalls
+    ON installsBySkuCountry.ProgramName == storeInstalls.ARPName
+    GROUP BY ProductId,Market,ProgramName;
+
+TopInstallsForProductId =
+    SELECT TOP 10000 *
+    FROM installsForProductId
+    ORDER BY InstallCount DESC
+    ;
+
+//final =
+//    SELECT *,
+//           ROW_NUMBER() OVER(PARTITION BY OSSkuGroupName, Market ORDER BY InstallCount DESC) AS RowNumber
+//    FROM installsBySkuCountry
+//    HAVING RowNumber <= 1000;
+
+//OUTPUT final
+//TO SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/TopInstallsData.ss"
+//   WITH STREAMEXPIRY "30";
+
+//OUTPUT installsForProductId
+//TO SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/TopInstallsProductMapping.ss"
+//   WITH STREAMEXPIRY "30";
+
+OUTPUT installStoreMapByKey
+TO SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/InstallsProductMappingByKey2.ss"
+   WITH STREAMEXPIRY "30";
+
+OUTPUT installTop
+TO SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/TopInstallsProductMappingByKey2.ss"
+   WITH STREAMEXPIRY "30";
+
+
+OUTPUT installsForProductId
+TO SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/InstallsProductMappingByName.ss"
+   WITH STREAMEXPIRY "30";
+
+OUTPUT TopInstallsForProductId
+TO SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/TopInstallsProductMappingByName.ss"
+   WITH STREAMEXPIRY "30";

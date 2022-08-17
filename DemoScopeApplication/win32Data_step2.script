@@ -1,0 +1,110 @@
+﻿//Script GUID:355106c3-e957-4114-bc6d-f1297fd1fb1a
+//Used for tracking history
+
+// --------------------------------------------------------------------------------------------------------------------
+// Modules & References
+// --------------------------------------------------------------------------------------------------------------------
+// NGP Tagging Module
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Census/Microsoft.Telemetry.Device.Census.dll";
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Common/Microsoft.Telemetry.Common.Utilities.dll";
+
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module";
+
+//----------------------------------------------------------------------------------------------------------------------------------------------------
+
+#DECLARE win32Installs string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/ProgramData2.ss";
+#DECLARE census string = @"/shares/asimov.prod.data/Public/Processed/Device/Census/Consolidated/DeviceCensusConsolidated.View";
+//This stream has list of "OSSkuGroupName" which are mapped to OSEdition (DeviceCensus stream) based on "OSSkuId" Column
+#DECLARE dimOSSku string = @"/shares/asimov.prod.data/Public/Processed/Common/Dimensions/DimOSSku/v1/DimOSSku.ss";
+
+installs = 
+    SELECT * 
+    FROM (SSTREAM @win32Installs);
+
+DeviceCensus =
+    VIEW @census
+    PARAMS
+    (
+        Version = "3"
+    )
+;
+
+DeviceCensus =
+    SELECT *,
+           ROW_NUMBER() OVER(PARTITION BY DeviceId ORDER BY LastUpdatedDate DESC) AS RowNumber
+    FROM DeviceCensus
+    WHERE IsTestLab == false && IsVirtualDevice == false && IncludeInDeviceCounts == true
+    && ISOCountryShortName IN ("Korea", "Japan", "South Korea", "United States", "China", "Germany", "France", "United Kingdom", "India", "Brazil", "South Africa", "Australia", "Canada", "Mexico")
+    HAVING RowNumber == 1;
+
+OUTPUT DeviceCensus
+TO SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/DeviceCensusData.ss"
+WITH STREAMEXPIRY "30";
+
+
+// --------------------------------------------------------------------------------------------------------------------
+// Get OSSkuGroupName column to clean up a lot of the specifics included in OsSku (based on SkuId)
+// --------------------------------------------------------------------------------------------------------------------
+DimOSSku=
+        SELECT DISTINCT OSSkuId,
+                        OSSkuGroupName
+        FROM (
+                SSTREAM @dimOSSku
+             );   
+
+cleaned_Devices=
+    SELECT DeviceCensus.DeviceId,
+           DeviceCensus.LinkedDeviceId,
+           DeviceCensus.ISOCountryShortCode AS Market,
+           String.IsNullOrEmpty(DimOSSku.OSSkuGroupName) ? "Unknown" : DimOSSku.OSSkuGroupName AS OSSkuGroupName
+    FROM DeviceCensus
+         LEFT OUTER JOIN DimOSSku
+    ON DeviceCensus.OSSkuId==DimOSSku.OSSkuId
+;
+
+
+OUTPUT cleaned_Devices
+TO SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/CleanedDevicesData.ss"
+WITH STREAMEXPIRY "30";
+
+
+installCountBase = 
+    SELECT installs.ProgramName,
+           installs.ProgramPublisher,
+           installs.ProgramInstallDate,
+//           installs.AppProgramKey,
+           installs.Key,
+           cleaned_Devices.OSSkuGroupName,
+           cleaned_Devices.Market,
+           COUNT(DISTINCT cleaned_Devices.LinkedDeviceId) AS InstallCount
+    FROM installs INNER JOIN cleaned_Devices ON installs.DeviceId == cleaned_Devices.DeviceId
+     
+    ;
+
+
+installCount = 
+    SELECT TOP 10000 *
+    FROM installCountBase
+    ORDER BY InstallCount DESC;
+
+//final = 
+//    SELECT *, 
+//           ROW_NUMBER() OVER(PARTITION BY OSSkuGroupName ORDER BY UniqueDeviceCount DESC) AS RowNumber
+//    FROM installCount
+//    HAVING RowNumber <= 1000
+//;
+
+
+OUTPUT installCountBase
+TO SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/ProgramInstallsData.ss"
+//PARTITION BY ProgramName, OSSkuGroupName
+WITH STREAMEXPIRY "30";
+
+OUTPUT installCount
+TO SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/win32Analytics/ProgramInstallsDataSorted.ss"
+//PARTITION BY ProgramName, OSSkuGroupName
+WITH STREAMEXPIRY "30";
+

@@ -1,0 +1,150 @@
+﻿//Script GUID:b0696950-f346-434d-a032-399843cf0b11
+//Used for tracking history
+
+// Date Parameters
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+
+// Stream Declarations
+#DECLARE outputRoot string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/Ingestion/";
+#DECLARE inputRoot string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/";
+
+#DECLARE storageAccount string = IF("@@storageAccount@@".StartsWith("@@"), "sparkstorageaccwus2int", "@@storageAccount@@");
+#DECLARE oldAggregateScore string = string.Format("{0}/{1}/AggregatedScoreIngested.ss", @outputRoot.TrimEnd(new[]{ '/' }), @storageAccount);
+#DECLARE failedProductsStream string = string.Format("{0}/{2}/{1:yyyy}/{1:MM}/FailedProductsStream_{1:yyyy}_{1:MM}_{1:dd}.ss", @outputRoot.TrimEnd(new[]{ '/' }), @endDate, @storageAccount);
+#DECLARE newAggregateScore string =  IF("@@newStream@@".StartsWith("@@"), string.Format("{0}/{1:yyyy}/{1:MM}/AggregatedScore_{1:yyyy}_{1:MM}_{1:dd}.ss", @inputRoot.TrimEnd(new[]{ '/' }), @endDate), "@@newStream@@");
+//#DECLARE newAggregateScore string = @"/users/vijeetthomas/RelevanceScore/RnRAllApps/2022/05/AggregatedScore_2022_05_20.ss";
+#DECLARE scoreDiffThreshold int =  IF("@@threshold@@".StartsWith("@@"), 500, Int32.Parse("@@threshold@@"));
+#DECLARE streamExpiryString string = "180";
+#DECLARE overrideFailChecks bool = IF("@@overrideFailChecks@@".StartsWith("@@"), false, Boolean.Parse("@@overrideFailChecks@@"));
+#DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+
+oldStream =
+    SELECT *
+    FROM
+    (
+        SSTREAM @oldAggregateScore
+    );
+
+newStream =
+    SELECT *
+    FROM
+    (
+        SSTREAM @newAggregateScore
+    );
+
+productNames =
+    SELECT *
+    FROM
+    (
+        SSTREAM @productNameMapper
+    );
+
+//Check 1
+count1 = SELECT COUNT(DISTINCT ProductId) AS OldCount
+    FROM oldStream;
+
+count2 = SELECT COUNT(DISTINCT ProductId) AS NewCount
+    FROM newStream;
+
+countOfProducts = 
+    SELECT OldCount,
+           NewCount
+    FROM count1 CROSS JOIN count2;
+
+check1 = 
+    SELECT FailChecks.productCountCheck(OldCount, NewCount, @overrideFailChecks) AS ProductCountCheck
+    FROM countOfProducts;
+
+//Check 2
+scoreDifference = 
+    SELECT a.ProductId,
+           a.Market,
+           a.AggregateScore AS OldScore,
+           b.AggregateScore AS NewScore,
+           FailChecks.getFailStatus(a.AggregateScore,b.AggregateScore) AS ScoreCheckStatus
+    FROM oldStream AS a
+    INNER JOIN newStream AS b
+    ON a.ProductId == b.ProductId AND a.Market == b.Market;
+
+scoreDifferenceCheck =
+    SELECT SUM(ScoreCheckStatus) AS TotalFail
+    FROM scoreDifference;
+
+failedProducts =
+    SELECT ProductId AS FailedProductId,
+           Market AS FailedMarket,
+           OldScore IS NULL ? 0 : OldScore AS OldScore,
+           NewScore IS NULL ? 0 : NewScore AS NewScore,
+           ScoreCheckStatus
+    FROM scoreDifference
+    WHERE ScoreCheckStatus == 1;
+
+failedProducts = 
+    SELECT a.*, b.ProductName
+    FROM failedProducts AS a 
+         INNER JOIN productNames AS b
+         ON a.FailedProductId == b.ProductId
+    WHERE FailedProductId IS NOT NULL;
+
+check2 =
+    SELECT FailChecks.scoreDifferenceCheck(TotalFail, @scoreDiffThreshold, @overrideFailChecks) AS ScoreDifferenceCheck
+    FROM scoreDifferenceCheck;
+
+allChecks =
+    SELECT *
+    FROM check1
+    CROSS JOIN
+        check2;
+
+failedProducts =
+    SELECT *
+    FROM failedProducts
+    CROSS JOIN
+        allChecks;
+
+failedProducts = SELECT DISTINCT * FROM failedProducts;
+
+OUTPUT failedProducts
+TO SSTREAM @failedProductsStream
+CLUSTERED BY FailedProductId
+SORTED BY FailedProductId
+WITH STREAMEXPIRY @streamExpiryString;
+      
+
+
+#CS
+static class FailChecks {
+
+    public static int productCountCheck (long oldCount, long newCount, bool overrideFailed)
+    {
+        if (oldCount != newCount || !overrideFailed) {
+            return 1;
+        }
+        return 0;
+    }
+
+    public static int scoreDifferenceCheck (long diffCount, long threshold, bool overrideFailed)
+    {
+        if (diffCount >= threshold || !overrideFailed) {
+            return 1;
+        }
+        return 0;
+    }  
+
+    public static int getFailStatus(long oldScore, long newScore) { 
+        if (oldScore < 1000) {
+            if (Math.Abs(oldScore-newScore)>150){
+                //throw new Exception("failed product");
+                return 1;
+            }
+        }
+        else {
+            if (Math.Abs(oldScore-newScore) > 0.3*oldScore) {
+                //throw new Exception("failed product");
+                return 1;
+            }
+        }
+        return 0;;
+    }
+}
+#ENDCS

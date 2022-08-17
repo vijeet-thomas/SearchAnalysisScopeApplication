@@ -1,0 +1,217 @@
+﻿//Script GUID:4832b3b6-9bea-4bcc-8b4b-867676e25edd
+//Used for tracking history
+
+// Schema Mapping
+
+// Output Schema           Input JSON                      Type or Example Object
+// -------------           ----------                      ----------------------
+// ProductId:              id                              string
+// Catalog:                catalog                         string
+// PartnerProductId:       partnerProductId                string
+//                         summaries                       [{"markets": ["US"], "rating": {"starsCount": [2076, 8068, 5939, 7170, 1914], "average": 1.5498676847433055, "type": "star"}]
+// Market                  summaries.markets[0]            string
+// OneStarRatings          summaries.rating.starsCount[0]  long
+// TwoStarRatings          summaries.rating.starsCount[1]  long
+// ThreeStarRatings        summaries.rating.starsCount[2]  long
+// FourStarRatings         summaries.rating.starsCount[3]  long
+// FiveStarRatings         summaries.rating.starsCount[4]  long
+// RatingsSum              derived from summaries.rating   long
+// RatingsCount            derived from summaries.rating   long
+// RatingsAverage          summaries.rating.average        double
+
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// Nebula parameters
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+SET @@FeaturePreviews = "EnableJsonOperators:on,EnableJsonIntrinsics:on";
+
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// NGP Tagging Module
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// References
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/Libraries/netstandard.dll";
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/Libraries/Newtonsoft.Json.dll";
+USING Newtonsoft.Json;
+USING Newtonsoft.Json.Converters;
+USING Newtonsoft.Json.Linq;
+
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// Parameters
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow, DateTime.Parse("@@endDate@@"));
+#DECLARE streamExpiry string = "180";
+
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// Input
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+#DECLARE androidRnRJson string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/JsonFiles/AndroidRnR_{0:yyyy_MM_dd}.json", @endDate);
+
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// Output
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+#DECLARE output_AndroidRnRDatedIntermediate string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/{0:yyyy}/{0:MM}/AndroidRatingsInter_{0:yyyy_MM_dd}.ss", @endDate);
+#DECLARE output_AndroidRnRDated string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/{0:yyyy}/{0:MM}/AndroidRatings_{0:yyyy_MM_dd}.ss", @endDate);
+
+// Read in the json file where each line is a json object
+rawJsonRows =
+EXTRACT ProductJson : string
+FROM @androidRnRJson
+USING DefaultTextExtractor();
+
+// Clean up the json
+jsonCleaned =
+SELECT Regex.Replace(ProductJson.Substring(1), @"]$", "") AS ProductJson
+FROM rawJsonRows;
+
+androidRnRInit =
+SELECT ScopeJson.Parse<string>(ProductJson, "id") AS ProductId,
+       ScopeJson.Parse<string>(ProductJson, "catalog") AS Catalog,
+       ScopeJson.Parse<string>(ProductJson, "partnerProductId") AS PartnerProductId,
+       ScopeJson.Parse<string>(ProductJson, "summaries") AS Summaries
+FROM jsonCleaned
+WHERE !string.IsNullOrWhiteSpace(ProductJson);
+
+[Privacy.Asset.NonPersonal]
+OUTPUT androidRnRInit
+TO SSTREAM @output_AndroidRnRDatedIntermediate;
+
+androidRnRInit =
+SELECT *.Except(Summaries),
+       JsonConvert.DeserializeObject<List<Summary>>(Summaries) AS MarketData
+FROM androidRnRInit
+WHERE !string.IsNullOrWhiteSpace(Summaries) AND Summaries != "[]";
+
+
+androidRnRInit =
+    SELECT RatingUtils.GetRatingPerMarket(MarketData, ProductId, Catalog, PartnerProductId) AS RatingsSet
+    FROM androidRnRInit;
+
+androidRnROutput =
+    SELECT ScopeJson.Parse<string>(RatingsSet, "ProductId") AS ProductId,
+           ScopeJson.Parse<string>(RatingsSet, "Market") AS Market,
+           ScopeJson.Parse<string>(RatingsSet, "Catalog") AS Catalog,
+           ScopeJson.Parse<string>(RatingsSet, "PartnerProductId") AS PartnerProductId,
+           ScopeJson.Parse<long>(RatingsSet, "OneStarRatings") AS OneStarRatings,
+           ScopeJson.Parse<long>(RatingsSet, "TwoStarRatings") AS TwoStarRatings,
+           ScopeJson.Parse<long>(RatingsSet, "ThreeStarRatings") AS ThreeStarRatings,
+           ScopeJson.Parse<long>(RatingsSet, "FourStarRatings") AS FourStarRatings,
+           ScopeJson.Parse<long>(RatingsSet, "FiveStarRatings") AS FiveStarRatings,
+           ScopeJson.Parse<double>(RatingsSet, "RatingsAverage") AS RatingsAverage,
+           ScopeJson.Parse<long>(RatingsSet, "RatingsCount") AS RatingsCount
+    FROM androidRnRInit
+    WHERE !string.IsNullOrWhiteSpace(RatingsSet);
+
+[Privacy.Asset.NonPersonal]
+OUTPUT androidRnROutput
+TO SSTREAM @output_AndroidRnRDated
+   CLUSTERED BY ProductId, Market
+       SORTED BY ProductId, Market
+WITH STREAMEXPIRY @streamExpiry;
+
+
+#CS
+
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
+using System;
+
+public static class RatingUtils 
+{
+    public static string GetRatingPerMarket(List<Summary> summaries, string ProductId, string Catalog, string PartnerProductId) {
+        
+        List<RatingsOutput> result = new List<RatingsOutput>();
+        foreach (var summary in summaries) {
+            if (summary != null && summary.markets[0] != null 
+                && summary.rating != null && summary.rating.starsCount != null) {
+                RatingsOutput ratObj = new RatingsOutput();
+                ratObj.ProductId = ProductId;
+                ratObj.PartnerProductId = PartnerProductId;
+                ratObj.Catalog = Catalog;
+                ratObj.Market = summary.markets[0];
+                ratObj.OneStarRatings = summary.rating.starsCount[0];
+                ratObj.TwoStarRatings = summary.rating.starsCount[1];
+                ratObj.ThreeStarRatings = summary.rating.starsCount[2];
+                ratObj.FourStarRatings = summary.rating.starsCount[3];
+                ratObj.FiveStarRatings = summary.rating.starsCount[4];
+                ratObj.RatingsAverage = summary.rating.average;
+                ratObj.RatingsCount = summary.rating.starsCount[0] + summary.rating.starsCount[1] + summary.rating.starsCount[2] + summary.rating.starsCount[3] + summary.rating.starsCount[4];
+                result.Add(ratObj);
+            }
+        }
+        
+        return string.Join(",", result);
+    }
+}
+public class Summary 
+{
+    [JsonProperty("markets")]
+    public List<string> markets;
+    
+    [JsonProperty("rating")]
+    public Ratings rating;
+
+}
+
+public class Ratings 
+{
+    [JsonProperty("starsCount")]
+    public List<long> starsCount;
+    
+    [JsonProperty("average")]
+    public double average;
+
+    [JsonProperty("type")]
+    public string type;
+}
+
+public class RatingsOutput 
+{
+    [JsonProperty("ProductId")]
+    public string ProductId;
+
+    [JsonProperty("Market")]
+    public string Market;
+
+    [JsonProperty("PartnerProductId")]
+    public string PartnerProductId;
+
+    [JsonProperty("Catalog")]
+    public string Catalog;
+
+    [JsonProperty("OneStarRatings")]
+    public long OneStarRatings;
+
+    [JsonProperty("TwoStarRatings")]
+    public long TwoStarRatings;
+    
+    [JsonProperty("ThreeStarRatings")]
+    public long ThreeStarRatings;
+    
+    [JsonProperty("FourStarRatings")]
+    public long FourStarRatings;
+    
+    [JsonProperty("FiveStarRatings")]
+    public long FiveStarRatings;
+    
+    [JsonProperty("RatingsAverage")]
+    public double RatingsAverage;
+    
+    [JsonProperty("RatingsCount")]
+    public long RatingsCount;
+
+    public override string ToString()  
+    {  
+        string output = "{\"ProductId\":\""+ProductId+"\", \"Market\":\""+Market
+                        +"\", \"PartnerProductId\":\""+PartnerProductId+"\", \"Catalog\":\""+Catalog
+                        +"\", \"OneStarRatings\":"+OneStarRatings+", \"TwoStarRatings\":"+TwoStarRatings+", \"ThreeStarRatings\":"+ThreeStarRatings+", \"FourStarRatings\":"+FourStarRatings+", \"FiveStarRatings\":"+FiveStarRatings
+                        +", \"RatingsAverage\":"+RatingsAverage+", \"RatingsCount\":"+RatingsCount+"}";
+        return output;
+    }  
+}
+#ENDCS

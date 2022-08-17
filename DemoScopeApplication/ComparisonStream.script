@@ -1,0 +1,162 @@
+﻿//Script GUID:4b43950e-7c50-4837-b352-60ebbd58057e
+//Used for tracking history
+
+// --------------------------------------------------------------------------------------------------------------------
+// Modules & References
+// --------------------------------------------------------------------------------------------------------------------
+// NGP Tagging Module
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Census/Microsoft.Telemetry.Device.Census.dll";
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Common/Microsoft.Telemetry.Common.Utilities.dll";
+
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module";
+
+//----------------------------------------------------------------------------------------------------------------------------------------------------
+
+// Stream Parameters
+#DECLARE oldStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2021/12/AggregatedScore_2021_12_01.ss";
+#DECLARE newStream string = @"/users/vijeetthomas/search/Ratings/2021/12/AggregatedScore_2021_12_06.ss";
+
+oldData =   
+    SELECT *
+    FROM 
+    (
+        SSTREAM @oldStream
+    );
+
+oldData =  
+    SELECT ProductId,
+           Market,
+           AggregateScore AS OldAggregateScore
+    FROM oldData
+    WHERE Market == "US"
+          AND ProductId IN ("8D6KGWZL66K5",
+"8D6KGWZR35W2",
+"8D6KGWZL6F8C",
+"8D6KGWZL65M6",
+"8D6KGX0BMXV1",
+"8D6KGWXN27MN",
+"8D6KGWXN6WCF",
+"8D6KGWZL6CVF",
+"8D6KGWXMZKKK",
+"8D6KGWZL6FCV",
+"8D6KGWX5KM9R",
+"8D6KGX0L1KJW",
+"8D6KGWXQ40PJ",
+"8D6KGWZT5Z42",
+"8D6KGWZL66KL",
+"8D6KGWXKDZ27",
+"8D6KGWZL6B9M",
+"8D6KGWXN7NWB",
+"8D6KGWZL6659",
+"8D6KGWXMZMZH",
+"8D6KGX043336",
+"8D6KGWXN30DN",
+"8D6KGWX45W48",
+"8D6KGWZL6FP8",
+"8D6KGWZL670V",
+"8D6KGWXH1D9P",
+"8D6KGWZL6G97",
+"8D6KGWZL6DNZ",
+"8D6KGWXN929L",
+"8D6KGWZL6F7D",
+"8D6KGWZL6CMV",
+"8D6KGWZL6D9R",
+"8D6KGWZL65GJ",
+"8D6KGX0PR9JQ",
+"8D6KGX05SHFH",
+"8D6KGWXN6RFV",
+"8D6KGWZL6F6Z",
+"8D6KGWZR4TGN",
+"8D6KGWXN333B",
+"8D6KGWXN2FXD",
+"8D6KGWXN3XZ2",
+"8D6KGWXP5BM2",
+"8D6KGWX88K92",
+"8D6KGWZL6BZR",
+"8D6KGWXCR7GG",
+"8D6KGWZL6F7Q",
+"8D6KGWXN3QGR",
+"8D6KGWXN20WQ",
+"8D6KGWZL6FLP",
+"8D6KGWXHP030");
+
+newData =
+    SELECT *
+    FROM 
+    (
+        SSTREAM @newStream
+    );
+
+newData = 
+    SELECT ProductId,
+           Market,
+           AggregateScore AS NewAggregateScore
+    FROM newData
+    WHERE Market == "US"
+          AND ProductId IN ("8D6KGWZL66K5",
+"8D6KGWZR35W2",
+"8D6KGWZL6F8C",
+"8D6KGWZL65M6",
+"8D6KGX0BMXV1",
+"8D6KGWXN27MN",
+"8D6KGWXN6WCF",
+"8D6KGWZL6CVF",
+"8D6KGWXMZKKK",
+"8D6KGWZL6FCV",
+"8D6KGWX5KM9R",
+"8D6KGX0L1KJW",
+"8D6KGWXQ40PJ",
+"8D6KGWZT5Z42",
+"8D6KGWZL66KL",
+"8D6KGWXKDZ27",
+"8D6KGWZL6B9M",
+"8D6KGWXN7NWB",
+"8D6KGWZL6659",
+"8D6KGWXMZMZH",
+"8D6KGX043336",
+"8D6KGWXN30DN",
+"8D6KGWX45W48",
+"8D6KGWZL6FP8",
+"8D6KGWZL670V",
+"8D6KGWXH1D9P",
+"8D6KGWZL6G97",
+"8D6KGWZL6DNZ",
+"8D6KGWXN929L",
+"8D6KGWZL6F7D",
+"8D6KGWZL6CMV",
+"8D6KGWZL6D9R",
+"8D6KGWZL65GJ",
+"8D6KGX0PR9JQ",
+"8D6KGX05SHFH",
+"8D6KGWXN6RFV",
+"8D6KGWZL6F6Z",
+"8D6KGWZR4TGN",
+"8D6KGWXN333B",
+"8D6KGWXN2FXD",
+"8D6KGWXN3XZ2",
+"8D6KGWXP5BM2",
+"8D6KGWX88K92",
+"8D6KGWZL6BZR",
+"8D6KGWXCR7GG",
+"8D6KGWZL6F7Q",
+"8D6KGWXN3QGR",
+"8D6KGWXN20WQ",
+"8D6KGWZL6FLP",
+"8D6KGWXHP030");
+
+comparisonStream =
+    SELECT o.ProductId,
+           o.Market,
+           o.OldAggregateScore,
+           n.NewAggregateScore
+    FROM oldData AS o
+         LEFT JOIN
+             newData AS n
+         ON o.ProductId == n.ProductId;
+
+OUTPUT comparisonStream
+TO SSTREAM "/users/vijeetthomas/search/Comparison/TVStreamComparison.ss"
+   WITH STREAMEXPIRY "7";

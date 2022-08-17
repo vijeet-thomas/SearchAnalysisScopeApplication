@@ -1,0 +1,107 @@
+﻿//Script GUID:cf8294db-ae4b-4fcd-9c19-d00427b20e1f
+//Used for tracking history
+
+#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_06.ss";
+#DECLARE inputStream2 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_08.ss";
+#DECLARE inputStream3 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_13.ss";
+
+AgStream =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputStream
+    )
+    WHERE Market == "US";
+
+AgStream2 =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputStream2
+    )
+    WHERE Market == "US";
+
+AgStream3 =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputStream3
+    )
+    WHERE Market == "US";
+
+scoreSummary =
+    SELECT *,
+           (AggregateScore == 0? 1 : 0) AS AggregateScoreZero,
+           (AggregateScore <= 5 && AggregateScore > 0 ? 1 : 0) AS AggregateScoreLessThan5,
+           (AggregateScore <= 20 && AggregateScore > 5 ? 1 : 0) AS AggregateScoreLessThan20,
+           (AggregateScore <= 100 && AggregateScore > 20 ? 1 : 0) AS AggregateScoreLessThan100,
+           (AggregateScore <= 1000 && AggregateScore > 100? 1 : 0) AS AggregateScoreLessThan1000,
+           (AggregateScore <= 2000 && AggregateScore > 1000? 1 : 0) AS AggregateScoreLessThan2000,
+           (AggregateScore <= 5000 && AggregateScore > 2000? 1 : 0) AS AggregateScoreLessThan5000,
+           (AggregateScore > 5000 ? 1 : 0) AS AggregateScoreGreaterThan5000
+    FROM AgStream;
+
+scoreSummary2 =
+    SELECT *,
+           (AggregateScore == 0? 1 : 0) AS AggregateScoreZero,
+           (AggregateScore <= 5 && AggregateScore > 0 ? 1 : 0) AS AggregateScoreLessThan5,
+           (AggregateScore <= 20 && AggregateScore > 5 ? 1 : 0) AS AggregateScoreLessThan20,
+           (AggregateScore <= 100 && AggregateScore > 20 ? 1 : 0) AS AggregateScoreLessThan100,
+           (AggregateScore <= 1000 && AggregateScore > 100? 1 : 0) AS AggregateScoreLessThan1000,
+           (AggregateScore <= 2000 && AggregateScore > 1000? 1 : 0) AS AggregateScoreLessThan2000,
+           (AggregateScore <= 5000 && AggregateScore > 2000? 1 : 0) AS AggregateScoreLessThan5000,
+           (AggregateScore > 5000 ? 1 : 0) AS AggregateScoreGreaterThan5000
+    FROM AgStream2;
+
+scoreSummary3 =
+    SELECT *,
+           (AggregateScore == 0? 1 : 0) AS AggregateScoreZero,
+           (AggregateScore <= 5 && AggregateScore > 0 ? 1 : 0) AS AggregateScoreLessThan5,
+           (AggregateScore <= 20 && AggregateScore > 5 ? 1 : 0) AS AggregateScoreLessThan20,
+           (AggregateScore <= 100 && AggregateScore > 20 ? 1 : 0) AS AggregateScoreLessThan100,
+           (AggregateScore <= 1000 && AggregateScore > 100? 1 : 0) AS AggregateScoreLessThan1000,
+           (AggregateScore <= 2000 && AggregateScore > 1000? 1 : 0) AS AggregateScoreLessThan2000,
+           (AggregateScore <= 5000 && AggregateScore > 2000? 1 : 0) AS AggregateScoreLessThan5000,
+           (AggregateScore > 5000 ? 1 : 0) AS AggregateScoreGreaterThan5000
+    FROM AgStream3;
+
+scoreSummary = 
+    SELECT SUM(AggregateScoreZero) AS AggregateScoreZero,
+           SUM(AggregateScoreLessThan5) AS AggregateScoreLessThan5,
+           SUM(AggregateScoreLessThan20) AS AggregateScoreLessThan20,
+           SUM(AggregateScoreLessThan100) AS AggregateScoreLessThan100,
+           SUM(AggregateScoreLessThan1000) AS AggregateScoreLessThan1000,
+           SUM(AggregateScoreLessThan2000) AS AggregateScoreLessThan2000,
+           SUM(AggregateScoreLessThan5000) AS AggregateScoreLessThan5000,
+           SUM(AggregateScoreGreaterThan5000) AS AggregateScoreGreaterThan5000
+    FROM scoreSummary;
+
+scoreSummary2 = 
+    SELECT SUM(AggregateScoreZero) AS AggregateScoreZero,
+           SUM(AggregateScoreLessThan5) AS AggregateScoreLessThan5,
+           SUM(AggregateScoreLessThan20) AS AggregateScoreLessThan20,
+           SUM(AggregateScoreLessThan100) AS AggregateScoreLessThan100,
+           SUM(AggregateScoreLessThan1000) AS AggregateScoreLessThan1000,
+           SUM(AggregateScoreLessThan2000) AS AggregateScoreLessThan2000,
+           SUM(AggregateScoreLessThan5000) AS AggregateScoreLessThan5000,
+           SUM(AggregateScoreGreaterThan5000) AS AggregateScoreGreaterThan5000
+    FROM scoreSummary2;
+
+scoreSummary3 = 
+    SELECT SUM(AggregateScoreZero) AS AggregateScoreZero,
+           SUM(AggregateScoreLessThan5) AS AggregateScoreLessThan5,
+           SUM(AggregateScoreLessThan20) AS AggregateScoreLessThan20,
+           SUM(AggregateScoreLessThan100) AS AggregateScoreLessThan100,
+           SUM(AggregateScoreLessThan1000) AS AggregateScoreLessThan1000,
+           SUM(AggregateScoreLessThan2000) AS AggregateScoreLessThan2000,
+           SUM(AggregateScoreLessThan5000) AS AggregateScoreLessThan5000,
+           SUM(AggregateScoreGreaterThan5000) AS AggregateScoreGreaterThan5000
+    FROM scoreSummary3;
+
+OUTPUT scoreSummary TO SSTREAM @"/users/vijeetthomas/search/ScoreSummary.ss";
+OUTPUT scoreSummary2 TO SSTREAM @"/users/vijeetthomas/search/ScoreSummary2.ss";
+OUTPUT scoreSummary3 TO SSTREAM @"/users/vijeetthomas/search/ScoreSummary3.ss";
+
+scoreSummaryFinal = SELECT * FROM scoreSummary UNION SELECT * FROM scoreSummary2 UNION SELECT * FROM scoreSummary3;
+
+OUTPUT scoreSummaryFinal TO SSTREAM @"/users/vijeetthomas/search/ScoreSummaryFinal.ss";

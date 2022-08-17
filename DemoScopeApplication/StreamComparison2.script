@@ -1,0 +1,62 @@
+﻿//Script GUID:7110f290-e2a9-4246-9285-d6836a92a7de
+//Used for tracking history
+// Date Parameters
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+
+// Stream Declarations
+#DECLARE outputRoot string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/Ingestion/";
+#DECLARE inputRoot string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/";
+
+#DECLARE ingestedAggregateScore string = string.Format("{0}/AggregatedScoreIngested.ss", @outputRoot.TrimEnd(new[]{ '/' }));
+#DECLARE failedProductsStream string = string.Format("{0}/{1:yyyy}/{1:MM}/FailedProductsStream_{1:yyyy}_{1:MM}_{1:dd}.ss", @outputRoot.TrimEnd(new[]{ '/' }), @endDate);
+#DECLARE newAggregateScore string =  IF("@@newStream@@".StartsWith("@@"), string.Format("{0}/{1:yyyy}/{1:MM}/AggregatedScore_{1:yyyy}_{1:MM}_{1:dd}.ss", @inputRoot.TrimEnd(new[]{ '/' }), @endDate), "@@newStream@@");
+
+#DECLARE streamExpiryString string = "180";
+
+failedProducts =
+    SELECT *
+    FROM
+    (
+        SSTREAM @failedProductsStream
+    );
+
+newStream =
+    SELECT *
+    FROM
+    (
+        SSTREAM @newAggregateScore
+    );
+
+newStream =
+    SELECT a.*,
+           b.OldScore,
+           FailChecks.allChecks(b.ProductCountCheck, b.ScoreDifferenceCheck) AS allCheckResult
+    FROM newStream AS a
+    LEFT JOIN
+        failedProducts AS b
+        ON a.ProductId == b.FailedProductId;
+
+//all checks passed
+OUTPUT newStream
+TO SSTREAM @ingestedAggregateScore
+CLUSTERED BY ProductId
+SORTED BY ProductId
+WITH STREAMEXPIRY @streamExpiryString;
+
+#CS
+static class FailChecks {
+    public static int allChecks (int? check1, int? check2) {
+        if (check1 == 0 && check2 == 0) {
+            return 0;
+        }
+        if (check1 == 1) {
+            throw new Exception("Product counts don't match");
+        }
+        if (check2 == 1) {
+            throw new Exception("High number of score variations");
+        }
+        return 1;
+    }
+}
+
+#ENDCS

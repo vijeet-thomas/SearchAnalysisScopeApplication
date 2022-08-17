@@ -1,0 +1,159 @@
+﻿<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>cbcc639f-6c2f-44cc-9cdc-8df577864f01</ProjectGuid>
+    <OutputType>File</OutputType>
+    <AssemblyName>Algebra.xml</AssemblyName>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <Name>DemoScopeApplication</Name>
+    <RootNamespace>DemoScopeApplication</RootNamespace>
+    <VCSelectionInProjectProperty>&lt;Use Current VC in VC Selector&gt;</VCSelectionInProjectProperty>
+    <CosmosRuntimeVersion>Default</CosmosRuntimeVersion>
+    <ScopePath>%24(SCRIPT_DIR);%24(CLUSTER_ROOT);%24(SCOPE_DIR);%24(PROJECT_DIR)</ScopePath>
+    <InputStreamSearchPath>%24(PROJECT_DIR);%24(SCRIPT_DIR);%24(CLUSTER_ROOT)</InputStreamSearchPath>
+    <VertexDebugSolution>false</VertexDebugSolution>
+    <BuildNScripts>False</BuildNScripts>
+    <NScriptsToBuild />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug\</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugSymbols>false</DebugSymbols>
+    <OutputPath>bin\Release\</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Script Include="AndroidRnRExtract.script" />
+    <Script Include="ComparisonStream.script" />
+    <Script Include="Fraud Analysis.script" />
+    <Script Include="GetProductNames.script" />
+    <Script Include="InstallsAnalysis.script" />
+    <Script Include="InstallsDistributionAnalysis.script" />
+    <Script Include="MADAnalysis.script" />
+    <Script Include="MADCoerageCheck.script" />
+    <Script Include="MADCoverageCheck.script" />
+    <Script Include="MADScript2.script" />
+    <Script Include="MADScript3.script" />
+    <Script Include="HPC Analysis.script" />
+    <Script Include="Ratings analysis.script" />
+    <Script Include="MADScript1.script" />
+    <Script Include="ScoreCheckAnalysis.script" />
+    <Script Include="ScorePopularityAnalysis.script" />
+    <Script Include="StoreAutoSuggestSummary.script" />
+    <Script Include="StoreSearchSummary.script" />
+    <Script Include="Script1.script" />
+    <Script Include="Script2.script" />
+    <Script Include="StreamAnalysis.script" />
+    <Script Include="StreamComparison.script">
+      <RemoveUselessParameters>False</RemoveUselessParameters>
+      <ScopeClusterParameters>
+      </ScopeClusterParameters>
+    </Script>
+    <Script Include="StreamComparison2.script" />
+    <Script Include="StreamFilter.script" />
+    <Script Include="StreamFilter2.script" />
+    <Script Include="StringLength.script" />
+    <Script Include="TopAppsInStream.script" />
+    <Script Include="TopInstallsForDifferentGroups.script" />
+    <Script Include="win32Data.script" />
+    <Script Include="win32Data_step2.script" />
+    <Script Include="win32Data_step3.script" />
+    <Script Include="WriteStreamToNewLocation.script">
+      <RemoveUselessParameters>False</RemoveUselessParameters>
+      <ScopeClusterParameters>storageAccount=(sparkstorageaccwus2prod)</ScopeClusterParameters>
+      <ScopeOldParameters>storageAccount=(sparkstorageacceus2prod)</ScopeOldParameters>
+    </Script>
+    <ScriptCode Include="AndroidRnRExtract.script.cs">
+      <DependentUpon>AndroidRnRExtract.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="ComparisonStream.script.cs">
+      <DependentUpon>ComparisonStream.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Fraud Analysis.script.cs">
+      <DependentUpon>Fraud Analysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="GetProductNames.script.cs">
+      <DependentUpon>GetProductNames.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="InstallsAnalysis.script.cs">
+      <DependentUpon>InstallsAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="MADCoerageCheck.script.cs">
+      <DependentUpon>MADCoerageCheck.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="MADScript2.script.cs">
+      <DependentUpon>MADScript2.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="MADScript3.script.cs">
+      <DependentUpon>MADScript3.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="HPC Analysis.script.cs">
+      <DependentUpon>HPC Analysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Ratings analysis.script.cs">
+      <DependentUpon>Ratings analysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="MADScript1.script.cs">
+      <DependentUpon>MADScript1.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="ScoreCheckAnalysis.script.cs">
+      <DependentUpon>ScoreCheckAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="ScorePopularityAnalysis.script.cs">
+      <DependentUpon>ScorePopularityAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="StoreAutoSuggestSummary.script.cs">
+      <DependentUpon>StoreAutoSuggestSummary.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="StoreSearchSummary.script.cs">
+      <DependentUpon>StoreSearchSummary.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Script1.script.cs">
+      <DependentUpon>Script1.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Script2.script.cs">
+      <DependentUpon>Script2.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="StreamAnalysis.script.cs">
+      <DependentUpon>StreamAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="StreamComparison.script.cs">
+      <DependentUpon>StreamComparison.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="StreamComparison2.script.cs">
+      <DependentUpon>StreamComparison2.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="StreamFilter.script.cs">
+      <DependentUpon>StreamFilter.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="StreamFilter2.script.cs">
+      <DependentUpon>StreamFilter2.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="StringLength.script.cs">
+      <DependentUpon>StringLength.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="TopAppsInStream.script.cs">
+      <DependentUpon>TopAppsInStream.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="TopInstallsForDifferentGroups.script.cs">
+      <DependentUpon>TopInstallsForDifferentGroups.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="win32Data.script.cs">
+      <DependentUpon>win32Data.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="win32Data_step2.script.cs">
+      <DependentUpon>win32Data_step2.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="win32Data_step3.script.cs">
+      <DependentUpon>win32Data_step3.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="WriteStreamToNewLocation.script.cs">
+      <DependentUpon>WriteStreamToNewLocation.script</DependentUpon>
+    </ScriptCode>
+  </ItemGroup>
+  <Import Project="$(AppData)\Microsoft\ScopeStudio\MsBuild\1.0\Scope.targets" />
+</Project>

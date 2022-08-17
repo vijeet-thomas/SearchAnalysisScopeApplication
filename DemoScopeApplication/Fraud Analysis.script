@@ -1,0 +1,77 @@
+﻿//Script GUID:f3b7f244-2557-4298-9cec-b8008d9405d2
+//Used for tracking history
+
+// NGP Tagging Module
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+// --------------------------------------------------------------------------------------------------------------------
+#DECLARE streamExpiryString string = "30";
+// --------------------------------------------------------------------------------------------------------------------
+
+// Streams and Views
+RatingsStream = SSTREAM @"/shares/asimov.prod.data/PublicPartner/Processed/DSXRatings/prod/cooked/dataForPartners/V2/RatingsSummaryWithDeviceFamily/Trending/RatingsSummaryWithDeviceFamily.ss";
+#DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+// --------------------------------------------------------------------------------------------------------------------
+
+
+Ratings =
+    SELECT *
+    FROM RatingsStream
+    WHERE !string.IsNullOrWhiteSpace(ProductId)
+          AND !string.IsNullOrWhiteSpace(Market)
+          AND (!string.IsNullOrEmpty(DeviceFamily) && DeviceFamily.ToLowerInvariant() == "all");
+
+productNames =
+    SELECT *
+    FROM
+    (
+        SSTREAM @productNameMapper
+    );
+
+fraudCheck = 
+    SELECT b.ProductName,
+           r.*.Except(FraudCount),
+           ((r.FraudCount == null) ? 0 : r.FraudCount) AS FraudCountCleaned
+    FROM productNames AS b
+    LEFT JOIN Ratings AS r
+            ON b.ProductId == r.ProductId;
+
+fraudCheck =
+    SELECT *,
+           (FraudCountCleaned + RatingCount) AS TotalFraudAndRatingCount
+    FROM fraudCheck;
+
+fraudCheck =
+    SELECT *,
+           (RatingCount*100.0/TotalFraudAndRatingCount) AS RatingCountPercentage,
+           (FraudCountCleaned*100.0/TotalFraudAndRatingCount) AS FraudCountPercentage
+    FROM fraudCheck;
+
+fraudSummary =
+    SELECT *,
+           (FraudCountCleaned == 0? 1 : 0) AS FraudCountZero,
+           (FraudCountCleaned <= 5 && FraudCountCleaned > 0 ? 1 : 0) AS FraudCountLessThan5,
+           (FraudCountCleaned <= 10 && FraudCountCleaned > 5 ? 1 : 0) AS FraudCountLessThan10,
+           (FraudCountCleaned <= 20 && FraudCountCleaned > 10 ? 1 : 0) AS FraudCountLessThan20,
+           (FraudCountCleaned <= 100 && FraudCountCleaned > 20 ? 1 : 0) AS FraudCountLessThan100,
+           (FraudCountCleaned > 100? 1 : 0) AS FraudCountGreaterThanThan100
+    FROM fraudCheck;
+
+fraudSummary = 
+    SELECT SUM(FraudCountZero) AS FraudCountZero,
+           SUM(FraudCountLessThan5) AS FraudCountLessThan5,
+           SUM(FraudCountLessThan10) AS FraudCountLessThan10,
+           SUM(FraudCountLessThan20) AS FraudCountLessThan20,
+           SUM(FraudCountLessThan100) AS FraudCountLessThan100,
+           SUM(FraudCountGreaterThanThan100) AS FraudCountGreaterThanThan100
+    FROM fraudSummary;
+
+OUTPUT fraudSummary TO SSTREAM @"/users/vijeetthomas/search/Ratings/fraudSummary.ss";
+OUTPUT fraudCheck TO SSTREAM @"/users/vijeetthomas/search/Ratings/fraudAnalysis.ss"
+CLUSTERED BY ProductId, Market
+SORTED BY RatingCount DESC;
+
+OUTPUT fraudCheck TO SSTREAM @"/users/vijeetthomas/search/Ratings/fraudAnalysis2.ss"
+CLUSTERED BY ProductId, Market
+SORTED BY RatingCount,FraudCountCleaned;

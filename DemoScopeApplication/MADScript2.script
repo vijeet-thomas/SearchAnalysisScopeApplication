@@ -1,0 +1,110 @@
+﻿//Script GUID:046aec49-e187-4f9e-9736-2ac217df6628
+//Used for tracking history
+
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module"; 
+
+REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Microsoft.Telemetry.Cosmos.Application.dll";
+REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Device/Microsoft.Telemetry.Common.Utilities.dll";
+
+USING Microsoft.Telemetry.Cosmos.Application;
+USING Microsoft.Telemetry.Common.Utilities;
+MODULE "/shares/asimov.prod.data/Public/Resources/Latest/Dimensions/CommonDimensions.module" AS CommonDimensions;
+
+
+// Modules and References
+[PIN] MODULE "shares/asimov.prod.data/Public/Resources/Latest/Asimov/Api/v3/Asimov.Batch.module";
+
+//AppUsage fact cooker stck
+[PIN] MODULE "shares/asimov.prod.data/Public/Resources/Latest/Usage/DynamicView/FactsExtractor.module";
+[PIN] RESOURCE  "shares/asimov.prod.data/Public/Resources/Latest/Usage/DynamicView/AppUsage/AppUsageViews.xml";
+[PIN] REFERENCE "shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.Telemetry.AppUsage.dll";
+[PIN] REFERENCE "shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.OSG.OneStore.DnA.Cosmos.DynamicViewResolver.dll";
+[PIN] REFERENCE "shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.Telemetry.Cosmos.AppUsage.AsimovExtension.dll";
+
+#DECLARE aggregatedDataPath string = @"/users/vijeetthomas/AppUsage/AppUsageDataAll.ss";
+#DECLARE appmonikerProductIdMapper string = @"/shares/asimov.prod.data/Public/Processed/Common/Dimensions/Application/AppMonikerProductIdDictionary.ss";
+#DECLARE win32Mapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreAnalytics/Launches/SparkProductIdToAppMonikerMapping.ss";
+#DECLARE dimAppView string = @"/shares/asimov.prod.data/Public/Processed/Common/Dimensions/DimApp/DimApp.view"; 
+#DECLARE dimAppViewVersion string = "V9";
+
+dimApp =
+    VIEW @dimAppView
+    PARAMS
+    (
+        version = @dimAppViewVersion
+    );
+
+dimAppFiltered =
+    SELECT AppMoniker.Trim().ToLower() AS AppMonikerCleaned,
+           AppId,
+           OneStoreProductId AS ProductId
+    FROM dimApp
+    WHERE AppName != "" 
+          AND PublisherType != ""
+          AND AppType == "Modern"
+          AND !string.IsNullOrEmpty(AppMoniker);
+
+agv =
+    SELECT *,
+           AppMoniker.Trim().ToLower() AS AppMonikerCleaned
+    FROM 
+    (
+      SSTREAM @aggregatedDataPath  
+    )
+    WHERE !string.IsNullOrEmpty(AppMoniker);
+
+mappingData =
+    SELECT *,
+           AppMoniker.Trim().ToLower() AS AppMonikerCleaned
+    FROM 
+    (
+        SSTREAM @appmonikerProductIdMapper
+    );
+
+storeMapper =
+    SELECT *,
+           AppMoniker.Trim().ToLower() AS AppMonikerCleaned
+    FROM
+    (
+        SSTREAM @win32Mapper
+    );
+
+appMonikerUsageByProductId =
+    SELECT a.*,
+           m.ProductId AS AppProductId
+    FROM agv AS a
+         INNER JOIN
+             dimAppFiltered AS m
+         ON a.AppMonikerCleaned == m.AppMonikerCleaned;
+         //AND a.AppId == s.AppId;
+         
+appMonikerUsageByProductId = 
+    SELECT DISTINCT *
+    FROM appMonikerUsageByProductId;
+
+//AND a.AppId == m.AppId
+appWinUsageByProductId =
+    SELECT a.*,
+           s.ProductId AS WinProductId
+    FROM agv AS a
+         INNER JOIN
+             storeMapper AS s
+         ON a.AppMonikerCleaned == s.AppMonikerCleaned;
+
+//countdata1 =
+//    SELECT COUNT (DISTINCT AppMonikerCleaned) AS CountOfAppMonikers
+//    FROM agv;
+//        
+//OUTPUT countdata1 TO SSTREAM @"/users/vijeetthomas/AppUsage/AggregateDataDistribution.ss";
+OUTPUT appMonikerUsageByProductId TO SSTREAM @"/users/vijeetthomas/AppUsage/AppMonikerUsageByProductId.ss"
+CLUSTERED BY  AppProductId,
+            CountryName
+SORTED BY AvgMAD28 DESC;
+
+OUTPUT appWinUsageByProductId TO SSTREAM @"/users/vijeetthomas/AppUsage/AppWinUsageByProductId.ss"
+CLUSTERED BY  WinProductId,
+            CountryName
+SORTED BY AvgMAD28 DESC;

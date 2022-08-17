@@ -1,0 +1,10 @@
+﻿//Script GUID:49c0d886-c774-42ce-ac82-9beeb02053f6
+//Used for tracking history
+
+#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/07/AggregatedScore_2022_07_11.ss";
+#DECLARE storageAccount string = IF("@@storageAccount@@".StartsWith("@@"), "sparkstorageaccwus2int", "@@storageAccount@@");
+#DECLARE outputStream string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/Ingestion/{0}/AggregatedScoreIngested.ss", @storageAccount);
+
+input = SELECT * FROM (SSTREAM @inputStream);
+
+OUTPUT input TO SSTREAM @outputStream WITH STREAMEXPIRY "180";

@@ -1,0 +1,125 @@
+﻿//Script GUID:51c5da8c-ece9-4ee6-9327-0f54da9b4144
+//Used for tracking history
+
+
+// NGP Tagging Module
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module"; 
+
+REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Microsoft.Telemetry.Cosmos.Application.dll";
+REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Device/Microsoft.Telemetry.Common.Utilities.dll";
+
+USING Microsoft.Telemetry.Cosmos.Application;
+USING Microsoft.Telemetry.Common.Utilities;
+
+MODULE "/shares/asimov.prod.data/Public/Resources/Latest/Dimensions/CommonDimensions.module" AS CommonDimensions;
+
+// --------------------------------------------------------------------------------------------------------------------
+
+// Date Parameters
+#DECLARE timePeriodDays int = 180;
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate DateTime = @endDate.AddDays( - (@timePeriodDays - 1));
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+
+// Normalization Parameters 
+#DECLARE normalizedMinRange int = IF("@@normalizedMinRange@@".StartsWith("@@"), 0, int.Parse("@@normalizedMinRange@@"));
+#DECLARE normalizedMaxRange int = IF("@@normalizedMaxRange@@".StartsWith("@@"), 10000, int.Parse("@@normalizedMaxRange@@"));
+
+// --------------------------------------------------------------------------------------------------------------------
+#DECLARE streamExpiryString string = "30";
+// --------------------------------------------------------------------------------------------------------------------
+#DECLARE inputRoot string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/";
+
+// Input Streams and Views
+#DECLARE dimAppView string = @"/shares/asimov.prod.data/Public/Processed/Common/Dimensions/DimApp/DimApp.view"; 
+#DECLARE dimAppViewVersion string = "V9";
+
+#DECLARE dimVideoProductsStream string = string.Format("{0}/{1:yyyy}/{1:MM}/DimVideoFinal_{1:yyyy}_{1:MM}_{1:dd}.ss", @inputRoot.TrimEnd(new[]{ '/' }), @endDate);
+
+// Streams and Views
+RatingsStream = SSTREAM @"/shares/asimov.prod.data/PublicPartner/Processed/DSXRatings/prod/cooked/dataForPartners/V2/RatingsSummaryWithDeviceFamily/All/RatingsSummaryWithDeviceFamily.ss";
+#DECLARE inputStream string = @"/users/vijeetthomas/Search/RelevanceScore/2022/07/AggregatedScore_2022_07_30.ss";
+// --------------------------------------------------------------------------------------------------------------------
+
+
+Ratings =
+    SELECT *
+    FROM RatingsStream
+    WHERE !string.IsNullOrWhiteSpace(ProductId)
+          AND !string.IsNullOrWhiteSpace(Market)
+          AND (!string.IsNullOrEmpty(DeviceFamily) && DeviceFamily.ToLowerInvariant() == "all")
+          AND Market=="US";
+
+//dimVideoProductsUpdated = 
+//    SELECT *
+//    FROM 
+//        (
+//            SSTREAM @dimVideoProductsStream
+//        )
+//;
+//
+//dimVideoProducts = 
+//    SELECT ProductId,
+//           ProductGroupName,
+//           ProductTypeName
+//    FROM dimVideoProductsUpdated
+//    GROUP BY ProductId,
+//             ProductGroupName,
+//             ProductTypeName
+//    WHERE (ProductTypeName.Equals("TV Series") || ProductTypeName.Equals("Movie")) 
+//    ;
+
+filteredStream =
+    SELECT ProductId, Market
+    FROM
+    (
+        SSTREAM @inputStream
+    )
+    WHERE Market == "US";
+
+filteredRatings =
+    SELECT r.*.Except(RatingCount),
+           ((r.RatingCount == null) ? 0 : r.RatingCount) AS RatingCount
+    FROM filteredStream AS f
+    LEFT JOIN
+        Ratings AS r
+        ON r.ProductId == f.ProductId AND r.Market == f.Market;
+
+videosSummary =
+    SELECT *,
+           (RatingCount == 0? 1 : 0) AS RatingCountZero,
+           (RatingCount <= 5 && RatingCount > 0 ? 1 : 0) AS RatingCountLessThan5,
+           (RatingCount <= 20 && RatingCount > 5 ? 1 : 0) AS RatingCountLessThan20,
+           (RatingCount <= 100 && RatingCount > 20 ? 1 : 0) AS RatingCountLessThan100,
+           (RatingCount <= 1000 && RatingCount > 100? 1 : 0) AS RatingCountLessThan1000,
+           (RatingCount <= 2000 && RatingCount > 1000? 1 : 0) AS RatingCountLessThan2000,
+           (RatingCount <= 100000 && RatingCount > 2000? 1 : 0) AS RatingCountLessThan100000,
+           (RatingCount > 100000 ? 1 : 0) AS RatingCountGreaterThan100000
+    FROM filteredRatings;
+
+videosSummary = 
+    SELECT SUM(RatingCountZero) AS RatingCountZero,
+           SUM(RatingCountLessThan5) AS RatingCountLessThan5,
+           SUM(RatingCountLessThan20) AS RatingCountLessThan20,
+           SUM(RatingCountLessThan100) AS RatingCountLessThan100,
+           SUM(RatingCountLessThan1000) AS RatingCountLessThan1000,
+           SUM(RatingCountLessThan2000) AS RatingCountLessThan2000,
+           SUM(RatingCountLessThan100000) AS RatingCountLessThan100000,
+           SUM(RatingCountGreaterThan100000) AS RatingCountGreaterThan100000
+    FROM videosSummary;
+
+OUTPUT videosSummary TO SSTREAM @"/users/vijeetthomas/search/Analysis/RatingsAnalysis.ss";
+/*
+    LEFT JOIN modernAppAndGameProducts AS a
+        ON p.ProductId == a.ProductId
+    
+    LEFT JOIN dimVideoProducts AS v 
+        ON p.ProductId == v.ProductId
+        
+    LEFT JOIN dimWin32Apps AS w 
+        ON p.ProductId == w.ProductId
+*/

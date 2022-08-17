@@ -1,0 +1,325 @@
+﻿//Script GUID:8b5a8586-926c-48b5-a48f-7d13ef7a8368
+//Used for tracking history
+
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module"; 
+
+REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Microsoft.Telemetry.Cosmos.Application.dll";
+REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Device/Microsoft.Telemetry.Common.Utilities.dll";
+
+USING Microsoft.Telemetry.Cosmos.Application;
+USING Microsoft.Telemetry.Common.Utilities;
+
+// Modules and References
+[PIN] MODULE "shares/asimov.prod.data/Public/Resources/Latest/Asimov/Api/v3/Asimov.Batch.module";
+
+//AppUsage fact cooker stck
+[PIN] MODULE "shares/asimov.prod.data/Public/Resources/Latest/Usage/DynamicView/FactsExtractor.module";
+[PIN] RESOURCE  "shares/asimov.prod.data/Public/Resources/Latest/Usage/DynamicView/AppUsage/AppUsageViews.xml";
+[PIN] REFERENCE "shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.Telemetry.AppUsage.dll";
+[PIN] REFERENCE "shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.OSG.OneStore.DnA.Cosmos.DynamicViewResolver.dll";
+[PIN] REFERENCE "shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.Telemetry.Cosmos.AppUsage.AsimovExtension.dll";
+
+//#DECLARE aggregatedViewPath string = "/shares/asimov.prod.data/Public/Processed/Usage/AppUsage/AggregatedAppUsageMetrics/AggregatedAppUsageMetrics.view";
+#DECLARE appUsageViewPath string = "/shares/asimov.prod.data/Public/Processed/Usage/AppUsage/AppUsageMetrics/AppUsageMetricsByOsmajorApp_v06.view";
+#DECLARE appmonikerProductIdMapper string = @"/shares/asimov.prod.data/Public/Processed/Common/Dimensions/Application/AppMonikerProductIdDictionary.ss";
+#DECLARE win32Mapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreAnalytics/Launches/SparkProductIdToAppMonikerMapping.ss";
+
+agv1 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 1).Year, DateTime.UtcNow.AddMonths( - 1).Month, 15),//.AddMonths(1).AddDays(-1),
+        newDate = new DateTime(oldDate.Year, oldDate.Month, oldDate.Day, 12, 30 , 0),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 1).Year, DateTime.UtcNow.AddMonths( - 1).Month, 15)//.AddMonths(1).AddDays(-1)
+	);
+
+
+agv2 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 2).Year, DateTime.UtcNow.AddMonths( - 2).Month, 1).AddMonths(1).AddDays(-1),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 2).Year, DateTime.UtcNow.AddMonths( - 2).Month, 1).AddMonths(1).AddDays(-1)
+	);
+
+agv3 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 3).Year, DateTime.UtcNow.AddMonths( - 3).Month, 1).AddMonths(1).AddDays(-1),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 3).Year, DateTime.UtcNow.AddMonths( - 3).Month, 1).AddMonths(1).AddDays(-1)
+	);
+
+agv4 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 4).Year, DateTime.UtcNow.AddMonths( - 4).Month, 1).AddMonths(1).AddDays(-1),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 4).Year, DateTime.UtcNow.AddMonths( - 4).Month, 1).AddMonths(1).AddDays(-1)
+	);
+
+agv5 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 5).Year, DateTime.UtcNow.AddMonths( - 5).Month, 1).AddMonths(1).AddDays(-1),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 5).Year, DateTime.UtcNow.AddMonths( - 5).Month, 1).AddMonths(1).AddDays(-1)
+	);
+
+agv6 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 6).Year, DateTime.UtcNow.AddMonths( - 6).Month, 1).AddMonths(1).AddDays(-1),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 6).Year, DateTime.UtcNow.AddMonths( - 6).Month, 1).AddMonths(1).AddDays(-1)
+	);
+
+agv7 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 7).Year, DateTime.UtcNow.AddMonths( - 7).Month, 1).AddMonths(1).AddDays(-1),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 7).Year, DateTime.UtcNow.AddMonths( - 7).Month, 1).AddMonths(1).AddDays(-1)
+	);
+
+agv8 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 8).Year, DateTime.UtcNow.AddMonths( - 8).Month, 1).AddMonths(1).AddDays(-1),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 8).Year, DateTime.UtcNow.AddMonths( - 8).Month, 1).AddMonths(1).AddDays(-1)
+	);
+
+agv9 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 9).Year, DateTime.UtcNow.AddMonths( - 9).Month, 1).AddMonths(1).AddDays(-1),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 9).Year, DateTime.UtcNow.AddMonths( - 9).Month, 1).AddMonths(1).AddDays(-1)
+	);
+
+agv10 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 10).Year, DateTime.UtcNow.AddMonths( - 10).Month, 1).AddMonths(1).AddDays(-1),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 10).Year, DateTime.UtcNow.AddMonths( - 10).Month, 1).AddMonths(1).AddDays(-1)
+	);
+
+agv11 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 11).Year, DateTime.UtcNow.AddMonths( - 11).Month, 1).AddMonths(1).AddDays(-1),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 11).Year, DateTime.UtcNow.AddMonths( - 11).Month, 1).AddMonths(1).AddDays(-1)
+	);
+
+agv12 = 
+VIEW @appUsageViewPath
+    PARAMS
+    (
+        startDate = new DateTime(DateTime.UtcNow.AddMonths( - 12).Year, DateTime.UtcNow.AddMonths( - 12).Month, 1).AddMonths(1).AddDays(-1),
+        endDate = new DateTime(DateTime.UtcNow.AddMonths( - 12).Year, DateTime.UtcNow.AddMonths( - 12).Month, 1).AddMonths(1).AddDays(-1)
+	);
+
+agv1 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv1;
+
+agv2 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv2;
+
+agv3 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv3;
+
+agv4 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv4;
+
+agv5 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv5;
+
+agv6 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv6;
+
+agv7 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv7;
+
+agv8 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv8;
+
+agv9 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv9;
+
+agv10 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv10;
+
+agv11 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv11;
+
+agv12 =
+    SELECT  
+            AppMonikerId,
+            AppMoniker,
+            OS,
+            OSName,
+            CountryName,
+            SUM(ActiveUserCount28Day) AS MAU28,
+            SUM(ActiveUserCount30Day) AS MAU30,
+            SUM(ActiveDeviceCount28Day) AS MAD28,
+            SUM(ActiveDeviceCount30Day) AS MAD30
+    FROM agv12;
+
+agv = SELECT * FROM agv1 
+          UNION
+      SELECT * FROM agv2
+          UNION
+      SELECT * FROM agv3
+          UNION
+      SELECT * FROM agv4
+          UNION
+      SELECT * FROM agv5
+          UNION
+      SELECT * FROM agv6
+          UNION
+      SELECT * FROM agv7
+          UNION
+      SELECT * FROM agv8
+          UNION
+      SELECT * FROM agv9
+          UNION
+      SELECT * FROM agv10
+          UNION
+      SELECT * FROM agv11
+          UNION
+      SELECT * FROM agv12;
+
+agv =
+    SELECT AppMonikerId,
+           AppMoniker,
+           OS,
+           OSName,
+           CountryName,
+           AVG(MAU28) AS AvgMAU28,
+           AVG(MAU30) AS AvgMAU30,
+           AVG(MAD28) AS AvgMAD28,
+           AVG(MAD30) AS AvgMAD30
+    FROM agv;
+
+agv = SELECT DISTINCT * FROM agv;
+      
+                    
+OUTPUT agv
+TO SSTREAM @"/users/vijeetthomas/AppUsage/AppUsageDataAll.ss"
+WITH STREAMEXPIRY "30";

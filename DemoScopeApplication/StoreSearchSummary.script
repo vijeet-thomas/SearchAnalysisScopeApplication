@@ -1,0 +1,133 @@
+﻿//Script GUID:0a00e1d6-82db-443a-ac6d-b6081e986214
+//Used for tracking history
+
+#DECLARE universalStoreView string = @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"; 
+#DECLARE madDataStream string = @"/users/honeytalreja/Search/RelevanceScore/2022/07/AppUsagedata_2022_07_11.ss";
+#DECLARE dimAppViewVersion string = "V9";
+#DECLARE streamExpiryString string = "180";
+#DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+
+productNames =
+    SELECT *
+    FROM
+    (
+        SSTREAM @productNameMapper
+    );
+
+universalStoreData =
+    VIEW @universalStoreView
+    PARAMS 
+    (
+        startDate = DateTime.UtcNow.AddDays( - 31).ToString("yyyy-MM-dd"),
+        endDate = DateTime.UtcNow.AddDays( - 1).ToString("yyyy-MM-dd")
+    )
+;
+
+madData =
+    SELECT *
+    FROM
+    (
+        SSTREAM @madDataStream
+    )
+    WHERE Market == "US"
+    ;
+
+universalStoreData =
+    SELECT *
+    FROM universalStoreData
+    WHERE SearchType == "Regular"
+            AND Country == "US"
+            AND SearchTerm.Length >= 3;
+
+TopSearchTerms =
+    SELECT TOP 1000 SearchTerm,
+           COUNT(DISTINCT UserIdFull) AS SearchCounts
+    FROM universalStoreData
+    ORDER BY SearchCounts DESC;
+
+TopSearchClicks =
+    SELECT a.SearchTerm,
+           a.ProductId,
+           a.ProductDisplayName IS NULL? c.ProductName : a.ProductDisplayName AS ProductName,
+           a.IsClicked? 1 : 0 AS ClickStatus
+//           SUM(ResultingSuccessfulAcquisitions_Free) AS FreeInstalls,
+//           SUM(ResultingSuccessfulAcquisitions_Paid) AS PaidInstalls,
+//           SUM(ResultingSuccessfulAcquisitions_Trial) AS TrialInstalls
+    FROM universalStoreData AS a
+    INNER JOIN
+        TopSearchTerms AS b
+        ON a.SearchTerm == b.SearchTerm
+    LEFT JOIN productNames AS c ON a.ProductId == c.ProductId;
+
+TopSearchClicks =
+    SELECT SearchTerm,
+           ProductId,
+           ProductName,
+           SUM(ClickStatus) AS ClickCounts
+    FROM TopSearchClicks;
+
+TopSearchClicks =
+    SELECT SearchTerm,
+           ProductId,
+           ProductName,
+           ClickCounts,
+           ROW_NUMBER() OVER (PARTITION BY SearchTerm ORDER BY ClickCounts DESC) AS SearchTermRank
+    FROM TopSearchClicks;
+
+TopSearchClicks =
+    SELECT *
+    FROM TopSearchClicks
+    WHERE SearchTermRank <= 20;
+
+TopSearchClicksWithMad =
+    SELECT a.SearchTerm,
+           a.ProductId,
+           a.ProductName,
+           b.MadCountCleaned IS NULL ? 0 : b.MadCountCleaned AS MadCountCleaned
+    FROM TopSearchClicks AS a
+    LEFT JOIN
+        madData AS b
+        ON a.ProductId == b.ProductId;
+
+TopSearchClicksWithMad =
+    SELECT *,
+           ROW_NUMBER() OVER(PARTITION BY SearchTerm ORDER BY MadCountCleaned DESC) AS ExpectedSearchTermRank
+    FROM TopSearchClicksWithMad;
+
+TopSearchTermsSummary = 
+    SELECT a.SearchTerm,
+           a.ProductId,
+           a.ProductName,
+           a.MadCountCleaned,
+           b.ClickCounts,
+           a.ExpectedSearchTermRank,
+           b.SearchTermRank AS ClicksRank,
+           c.SearchCounts
+    FROM TopSearchClicksWithMad AS a
+    LEFT JOIN
+        TopSearchClicks AS b
+        ON a.SearchTerm == b.SearchTerm AND a.ProductId == b.ProductId
+    LEFT JOIN 
+        TopSearchTerms AS c
+        ON a.SearchTerm == c.SearchTerm;
+ 
+
+OUTPUT TopSearchTerms TO SSTREAM @"/users/vijeetthomas/search/TopSearchTerms.ss" CLUSTERED BY SearchTerm SORTED BY SearchCounts DESC;
+
+OUTPUT TopSearchClicks TO SSTREAM @"/users/vijeetthomas/search/TopSearchProductsByTermsClick.ss" CLUSTERED BY SearchTerm;
+
+OUTPUT TopSearchClicksWithMad TO SSTREAM @"/users/vijeetthomas/search/TopSearchProductsByTermsMad.ss" CLUSTERED BY SearchTerm;
+
+OUTPUT TopSearchTermsSummary TO SSTREAM @"/users/vijeetthomas/search/TopSearchTermsSummary.ss" CLUSTERED BY SearchTerm SORTED BY SearchCounts DESC, ExpectedSearchTermRank ASC, ClicksRank ASC ;
+
+//
+//OUTPUT searchSummary 
+//    TO @"/users/vijeetthomas/search/UniversalStoreSearchSummary.csv"
+//    WITH STREAMEXPIRY @streamExpiryString
+//    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);
+//
+//OUTPUT searchSummary 
+//    TO SSTREAM @"/users/vijeetthomas/search/UniversalStoreSearchSummary.ss"
+//    CLUSTERED BY SearchTerm, Country, ProductId, ProductDisplayName
+//        SORTED BY AllInstalls DESC
+//       WITH STREAMEXPIRY @streamExpiryString;

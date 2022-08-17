@@ -1,0 +1,73 @@
+﻿//Script GUID:3cdf6801-6c4c-489f-81bf-118795d1b9df
+//Used for tracking history
+
+// Streams and Views
+AggregateScore = SSTREAM @"/users/honeytalreja/Search/RelevanceScore/2022/07/AggregatedScore_2022_07_11.ss";
+
+// --------------------------------------------------------------------------------------------------------------------
+
+
+Agstream =
+    SELECT *
+    FROM AggregateScore;
+
+ag1 =
+    SELECT COUNT(DISTINCT ProductId) AS TotalProducts
+    FROM Agstream;
+    
+
+ag2 =
+    SELECT COUNT(DISTINCT ProductId) AS TotalUSProducts
+    FROM Agstream
+    WHERE Market=="US";
+
+ag3 =
+    SELECT COUNT(DISTINCT ProductId) AS UWPOrWin32Products
+    FROM Agstream
+    WHERE ProductId.Length == 12;
+
+ag4 =
+    SELECT COUNT(DISTINCT ProductId) AS SparkProducts
+    FROM Agstream
+    WHERE ProductId.Length == 14;
+
+ag5 =
+    SELECT COUNT(DISTINCT ProductId) AS UWPOrWin32ProductsStartingWith8Or9
+    FROM Agstream
+    WHERE (ProductId.StartsWith("9") OR ProductId.StartsWith("8"))
+        AND ProductId.Length == 12;
+
+ag6 =
+    SELECT COUNT(DISTINCT ProductId) AS SparkProductsOrGamePassStartingWithXOrC
+    FROM Agstream
+    WHERE (ProductId.StartsWith("X") OR ProductId.StartsWith("C"))
+    AND ProductId.Length == 12;
+
+//
+outputStream = SELECT *
+                FROM ag1 CROSS JOIN
+                 ag2
+                CROSS JOIN
+                 ag3
+                CROSS JOIN
+                 ag4
+                CROSS JOIN
+                 ag5
+                CROSS JOIN
+                 ag6;
+
+//
+//ag3 =
+//    SELECT *
+//    FROM Agstream
+//    WHERE (ProductTypeName.Equals("TV Series") || ProductTypeName.Equals("Movie"));
+//
+OUTPUT outputStream
+TO SSTREAM @"/users/vijeetthomas/ScorePopularityCheck.ss"
+WITH STREAMEXPIRY "1";
+//
+//OUTPUT ag1
+//TO SSTREAM @"/users/vijeetthomas/ScorePopularityCheck2.ss"
+//WITH STREAMEXPIRY "1";
+
+

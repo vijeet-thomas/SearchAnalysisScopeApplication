@@ -1,0 +1,64 @@
+﻿//Script GUID:3db01536-5cd3-4960-8722-8582d36b7b5d
+//Used for tracking history
+
+// Streams and Views
+AggregateScoreStream = SSTREAM @"/users/honeytalreja/Search/RelevanceScore/2022/07/AggregatedScore_2022_07_11.ss";
+#DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+// --------------------------------------------------------------------------------------------------------------------
+
+productNames =
+    SELECT *
+    FROM
+    (
+        SSTREAM @productNameMapper
+    );
+
+
+Agstream =
+    SELECT b.ProductName,
+           a.ProductId,
+           Market,
+           ProductGroupName,
+           ProductTypeName,
+           InstallsCount,
+           InstallsNormalizedClean,
+           Win32InstallCountWeb,
+           Win32InstallsWebNormalizedClean,
+           Win32InstallCountStore,
+           Win32InstallsStoreNormalizedClean,
+           (Win32InstallsWebNormalizedClean + Win32InstallsStoreNormalizedClean) AS Win32TotalNormalizedScore,
+           AggregateScore
+    FROM AggregateScoreStream AS a
+    LEFT JOIN productNames AS b
+            ON a.ProductId == b.ProductId;
+
+ag1 =
+    SELECT TOP 25 * 
+    FROM Agstream
+    WHERE Market=="US"
+    AND Win32TotalNormalizedScore IS NOT NULL 
+    AND ProductName IS NOT NULL
+    ORDER BY Win32TotalNormalizedScore DESC;
+    
+
+ag2 =
+    SELECT TOP 25 *
+    FROM Agstream
+    WHERE Market=="US"
+    AND InstallsNormalizedClean IS NOT NULL
+    AND ProductName IS NOT NULL
+    ORDER BY InstallsNormalizedClean DESC;
+
+outputStream =
+    SELECT *
+    FROM ag1
+    UNION ALL
+    SELECT *
+    FROM ag2;
+
+OUTPUT outputStream
+TO SSTREAM @"/users/vijeetthomas/InstallsCheck.ss"
+CLUSTERED BY ProductId, Market
+SORTED BY AggregateScore DESC
+WITH STREAMEXPIRY "10";
+                            

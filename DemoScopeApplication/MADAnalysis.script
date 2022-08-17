@@ -1,0 +1,43 @@
+﻿//Script GUID:c8ce59de-54cc-4e5b-baeb-d2aeeb9899eb
+//Used for tracking history
+
+// Output
+#DECLARE MADStream string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AppUsagedata_2022_08_05.ss";
+#DECLARE streamExpiryString string = "30";
+
+MADData =
+    SELECT *
+    FROM
+    (
+        SSTREAM @MADStream
+    )
+    WHERE Market == "US";
+
+MAD28Distribution =
+    SELECT ProductId,
+           MadCountCleaned == 0 ? 1 : 0 AS E0,
+           MadCountCleaned <= 100 ? 1 : 0 AS L100,
+           MadCountCleaned > 100 AND MadCountCleaned <= 500 ? 1 : 0 AS L500,
+           MadCountCleaned > 500 AND MadCountCleaned <= 1000 ? 1 : 0 AS L1K,
+           MadCountCleaned > 1000 AND MadCountCleaned <= 10000 ? 1 : 0 AS L10K,
+           MadCountCleaned > 10000 AND MadCountCleaned <= 100000 ? 1 : 0 AS L100K,
+           MadCountCleaned > 100000 AND MadCountCleaned <= 1000000 ? 1 : 0 AS L1M,
+           MadCountCleaned == 1000000? 1 : 0 AS E1M,
+           MadCountCleaned >= 0 ? 1 : 0 AS TotalMAD28
+    FROM MADData;
+
+MAD28Distribution =
+    SELECT SUM(E0) AS E0,
+           SUM(L100) AS L100,
+           SUM(L500) AS L500,
+           SUM(L1K) AS L1K,
+           SUM(L10K) AS L10K,
+           SUM(L100K) AS L100K,
+           SUM(L1M) AS L1M,
+           SUM(E1M) AS E1M,
+           SUM(TotalMAD28) AS TotalMAD28
+    FROM MAD28Distribution;
+
+OUTPUT MAD28Distribution TO SSTREAM @"/users/vijeetthomas/search/Analysis/MADAnalysis.ss"
+WITH STREAMEXPIRY "30";
+

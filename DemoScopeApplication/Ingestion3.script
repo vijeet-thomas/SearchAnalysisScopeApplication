@@ -1,0 +1,106 @@
+﻿//Script GUID:c211e90b-b360-4670-8236-9d50a51f0cfd
+//Used for tracking history
+
+
+
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/Libraries/Microsoft.Bond.dll";
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/Libraries/Microsoft.Bond.Interfaces.dll";
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/Libraries/Newtonsoft.Json.dll";
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/Libraries/netstandard4.8.dll";
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/Libraries/System.Net.Http.dll";
+
+
+
+
+USING Newtonsoft.Json;
+USING Newtonsoft.Json.Linq;
+USING Newtonsoft.Json.Serialization;
+USING System;
+USING System.Collections.Generic;
+USING System.IO;
+USING System.Net;
+USING System.Net.Http;
+USING System.Text;
+
+
+ProductData =
+    SSTREAM @"/users/vijeetthomas/search/Ratings/Quality/2022/01/RelevanceJsonByProductId_2022_01_29.ss";
+
+TrancatedData =
+    SELECT RowNum,
+           ProductId,
+           MarketScoreJson
+    FROM ProductData
+    WHERE RowNum >= 200000;
+
+UpdatedData =
+    SELECT RowNum,
+           ProductId,
+           Helper.UploadToBlob(ProductId, MarketScoreJson) AS Status
+    FROM TrancatedData;
+
+OUTPUT UpdatedData
+TO SSTREAM @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StreamsPlaceholder/StoreAnalytics/RelevanceJsonByProductId_status03.ss"
+       CLUSTERED BY RowNum, ProductId
+       SORTED BY RowNum
+   WITH STREAMEXPIRY @"1";
+
+
+#CS
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+
+public static class Helper
+{
+
+        public static string UploadToBlob(string productid, string jsonContent)
+        {            
+            HttpClient httpClient = new HttpClient();
+            System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            
+            try
+            {
+                string storageAccount = "sparkstorageaccwus2int";
+                string requestUri = $"https://{storageAccount}.blob.core.windows.net/relevance-score/{productid}.json?sp=racw&st=2022-02-01T06:32:21Z&se=2022-02-03T14:32:21Z&spr=https&sv=2020-08-04&sr=c&sig=n7KmInI6NDOnd9iQuTifwh5DOo3WMe2pC4Ob3pbS33c%3D";
+
+                var request = new HttpRequestMessage()
+                {
+                    RequestUri = new Uri(requestUri),
+                    Method = HttpMethod.Put,
+                    Content = new StringContent(jsonContent, Encoding.UTF8, "application/json"),
+                };
+
+                request.Headers.Add("x-ms-version", "2020-08-04");
+
+                long contentLength = Encoding.UTF8.GetByteCount(jsonContent);
+                request.Content.Headers.ContentType.MediaType = "application/json";
+                request.Content.Headers.ContentLength = contentLength;
+                request.Headers.Add("x-ms-blob-content-disposition", $"attachment; filename=\"{productid}\"");
+                request.Headers.Add("x-ms-blob-type", "BlockBlob");
+                request.Headers.Add("x-ms-date", $"{DateTime.UtcNow}");
+
+                HttpResponseMessage response = httpClient.SendAsync(request).GetAwaiter().GetResult();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return $"Success: Status {response.StatusCode}";
+                }
+                else
+                {
+                    return $"Failed: Status {response.StatusCode}, Reason {response.ReasonPhrase} Conent: {response.Content.ReadAsStringAsync().GetAwaiter().GetResult()}";
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"Failed: {ex}";
+            }
+        }
+}
+#ENDCS

@@ -1,0 +1,46 @@
+﻿//Script GUID:94ea08d8-ea32-45a8-89ea-895d42fe4fa1
+//Used for tracking history
+
+//Script GUID:c8ce59de-54cc-4e5b-baeb-d2aeeb9899eb
+//Used for tracking history
+
+// Output
+#DECLARE installsStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/07/AttemptedInstallsByProductidMarket_2022_07_30.ss";
+#DECLARE streamExpiryString string = "30";
+
+installsData =
+    SELECT *
+    FROM
+    (
+        SSTREAM @installsStream
+    )
+    WHERE Market == "US";
+
+InstallsDistribution =
+    SELECT ProductId,
+           Installs == 0 ? 1 : 0 AS E0,
+           Installs <= 100 ? 1 : 0 AS L100,
+           Installs > 100 AND Installs <= 500 ? 1 : 0 AS L500,
+           Installs > 500 AND Installs <= 1000 ? 1 : 0 AS L1K,
+           Installs > 1000 AND Installs <= 10000 ? 1 : 0 AS L10K,
+           Installs > 10000 AND Installs <= 100000 ? 1 : 0 AS L100K,
+           Installs > 100000 AND Installs <= 1000000 ? 1 : 0 AS L1M,
+           Installs > 1000000? 1 : 0 AS G1M,
+           Installs >= 0 ? 1 : 0 AS TotalMAD28
+    FROM installsData;
+
+InstallsDistribution =
+    SELECT SUM(E0) AS E0,
+           SUM(L100) AS L100,
+           SUM(L500) AS L500,
+           SUM(L1K) AS L1K,
+           SUM(L10K) AS L10K,
+           SUM(L100K) AS L100K,
+           SUM(L1M) AS L1M,
+           SUM(G1M) AS G1M,
+           SUM(TotalMAD28) AS TotalMAD28
+    FROM InstallsDistribution;
+
+OUTPUT InstallsDistribution TO SSTREAM @"/users/vijeetthomas/search/Analysis/InstallsAnalysis.ss"
+WITH STREAMEXPIRY "30";
+

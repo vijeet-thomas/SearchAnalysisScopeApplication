@@ -1,0 +1,43 @@
+﻿//Script GUID:4696895a-1ad9-4100-af0b-35d7fb1608f4
+//Used for tracking history
+
+// Output
+#DECLARE installsStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/07/Win32InstallsByProductidMarketNorm_2022_07_30.ss";
+#DECLARE streamExpiryString string = "30";
+
+installsData =
+    SELECT *
+    FROM
+    (
+        SSTREAM @installsStream
+    )
+    WHERE Market == "US";
+
+InstallsDistribution =
+    SELECT ProductId,
+           Win32InstallCountStore == 0 ? 1 : 0 AS E0,
+           Win32InstallCountStore <= 100 ? 1 : 0 AS L100,
+           Win32InstallCountStore > 100 AND Win32InstallCountStore <= 500 ? 1 : 0 AS L500,
+           Win32InstallCountStore > 500 AND Win32InstallCountStore <= 1000 ? 1 : 0 AS L1K,
+           Win32InstallCountStore > 1000 AND Win32InstallCountStore <= 10000 ? 1 : 0 AS L10K,
+           Win32InstallCountStore > 10000 AND Win32InstallCountStore <= 100000 ? 1 : 0 AS L100K,
+           Win32InstallCountStore > 100000 AND Win32InstallCountStore <= 1000000 ? 1 : 0 AS L1M,
+           Win32InstallCountStore > 1000000? 1 : 0 AS G1M,
+           Win32InstallCountStore >= 0 ? 1 : 0 AS TotalMAD28
+    FROM installsData;
+
+InstallsDistribution =
+    SELECT SUM(E0) AS E0,
+           SUM(L100) AS L100,
+           SUM(L500) AS L500,
+           SUM(L1K) AS L1K,
+           SUM(L10K) AS L10K,
+           SUM(L100K) AS L100K,
+           SUM(L1M) AS L1M,
+           SUM(G1M) AS G1M,
+           SUM(TotalMAD28) AS TotalMAD28
+    FROM InstallsDistribution;
+
+OUTPUT InstallsDistribution TO SSTREAM @"/users/vijeetthomas/search/Analysis/Win32InstallsAnalysis.ss"
+WITH STREAMEXPIRY "30";
+

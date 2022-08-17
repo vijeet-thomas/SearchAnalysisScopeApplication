@@ -1,0 +1,89 @@
+﻿//Script GUID:8ca6bec9-7e3e-4483-9a51-0f877b295d47
+//Used for tracking history
+
+#DECLARE aggregateScoreStream1 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/04/AggregatedScore_2022_04_24.ss"; 
+#DECLARE aggregateScoreStream2 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/04/AggregatedScore_2022_04_10.ss"; 
+#DECLARE aggregateScoreStream3 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/04/AggregatedScore_2022_04_11.ss"; 
+#DECLARE aggregateScoreStream4 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/04/AggregatedScore_2022_04_12.ss"; 
+#DECLARE aggregateScoreStream5 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/04/AggregatedScore_2022_04_13.ss"; 
+#DECLARE streamExpiryString string = "180";
+
+aggScore1 =
+    SELECT TOP 100 ProductId,
+            AggregateScore AS agscore1
+    FROM
+    (
+        SSTREAM @aggregateScoreStream1
+    )
+    WHERE Market == "US"
+    ORDER BY agscore1 DESC
+;
+
+aggScore2 =
+    SELECT TOP 100 ProductId,
+            AggregateScore AS agscore2
+    FROM
+    (
+        SSTREAM @aggregateScoreStream2
+    )
+    WHERE Market == "US"
+    ORDER BY agscore2 DESC
+;
+
+aggScore3 =
+    SELECT TOP 100 ProductId,
+            AggregateScore AS agscore3
+    FROM
+    (
+        SSTREAM @aggregateScoreStream3
+    )
+    WHERE Market == "US"
+    ORDER BY agscore3 DESC
+;
+
+aggScore4 =
+    SELECT TOP 100 ProductId,
+            AggregateScore AS agscore4
+    FROM
+    (
+        SSTREAM @aggregateScoreStream4
+    )
+    WHERE Market == "US"
+    ORDER BY agscore4 DESC
+;
+
+aggScore5 =
+    SELECT TOP 100 ProductId,
+            AggregateScore AS agscore5
+    FROM
+    (
+        SSTREAM @aggregateScoreStream5
+    )
+    WHERE Market == "US"
+    ORDER BY agscore5 DESC
+;
+
+aggScoreSmmary =
+    SELECT aggScore1.ProductId,
+           agscore1,
+           agscore2,
+           agscore3,
+           agscore4,
+           agscore5
+    FROM aggScore1
+         INNER JOIN
+             aggScore2
+         ON aggScore1.ProductId == aggScore2.ProductId
+         INNER JOIN
+             aggScore3
+         ON aggScore1.ProductId == aggScore3.ProductId
+         INNER JOIN
+             aggScore4
+         ON aggScore1.ProductId == aggScore4.ProductId
+         INNER JOIN
+             aggScore5
+         ON aggScore1.ProductId == aggScore5.ProductId;
+
+OUTPUT aggScoreSmmary 
+    TO SSTREAM @"/users/vijeetthomas/search/AggregateScoreAnalysis.ss"
+       WITH STREAMEXPIRY @streamExpiryString;

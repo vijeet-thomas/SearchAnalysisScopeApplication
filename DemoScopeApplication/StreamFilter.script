@@ -1,0 +1,62 @@
+﻿//Script GUID:03c2bf3d-a016-4ca9-b588-d375e1de0773
+//Used for tracking history
+
+#DECLARE inputStream string = @"/users/vijeetthomas/Search/RelevanceScore/2022/07/AggregatedScore_2022_07_30.ss";
+#DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+#DECLARE topApps string = @"/users/vijeetthomas/TopInstalls/TopInstallsAppsAndGames.ss";
+#DECLARE topWin32 string = @"/users/vijeetthomas/TopInstalls/TopInstallsWin32.ss";
+#DECLARE topMoviesTV string = @"/users/vijeetthomas/TopInstalls/TopInstallsVideos.ss";
+#DECLARE topOther string = @"/users/vijeetthomas/TopInstalls/TopInstallsOther.ss";
+
+topProducts =
+    SELECT ProductName, ProductId, Market, ProductGroupName, ProductTypeName, AggregateScore
+    FROM
+    (
+        SSTREAM @topApps
+    )
+    UNION
+    SELECT ProductName, ProductId, Market, ProductGroupName, ProductTypeName, AggregateScore
+    FROM
+    (
+        SSTREAM @topWin32
+    )
+    UNION
+    SELECT ProductName, ProductId, Market, ProductGroupName, ProductTypeName, AggregateScore
+    FROM
+    (
+        SSTREAM @topMoviesTV
+    )
+    UNION
+    SELECT ProductName, ProductId, Market, ProductGroupName, ProductTypeName, AggregateScore
+    FROM
+    (
+        SSTREAM @topOther
+    );
+
+filteredStream =
+    SELECT a.ProductId, a.Market, b.ProductName, a.ProductGroupName, a.ProductTypeName, a.AggregateScore AS NewAggregateScore, b.AggregateScore AS OldAggregateScore
+    FROM
+    (
+        SSTREAM @inputStream
+    ) AS a 
+    INNER JOIN topProducts AS b
+         ON a.ProductId == b.ProductId
+    WHERE Market == "US";
+
+//productNames =
+//    SELECT *
+//    FROM
+//    (
+//        SSTREAM @productNameMapper
+//    );
+//
+//filteredStream = 
+//    SELECT a.*, b.ProductName
+//    FROM filteredStream AS a 
+//         INNER JOIN productNames AS b
+//         ON a.ProductId == b.ProductId;
+
+OUTPUT filteredStream
+TO SSTREAM "/users/vijeetthomas/RelevanceScore/RnRAllApps/2022/07/AggregatedScoreFiltered_2022_07_12.ss"
+CLUSTERED BY ProductId
+SORTED BY ProductId;
