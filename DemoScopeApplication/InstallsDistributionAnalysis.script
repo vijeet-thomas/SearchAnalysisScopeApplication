@@ -5,7 +5,7 @@
 //Used for tracking history
 
 // Output
-#DECLARE installsStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/07/AttemptedInstallsByProductidMarket_2022_07_30.ss";
+#DECLARE installsStream string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_19.ss";
 #DECLARE streamExpiryString string = "30";
 
 installsData =
@@ -18,15 +18,15 @@ installsData =
 
 InstallsDistribution =
     SELECT ProductId,
-           Installs == 0 ? 1 : 0 AS E0,
-           Installs <= 100 ? 1 : 0 AS L100,
-           Installs > 100 AND Installs <= 500 ? 1 : 0 AS L500,
-           Installs > 500 AND Installs <= 1000 ? 1 : 0 AS L1K,
-           Installs > 1000 AND Installs <= 10000 ? 1 : 0 AS L10K,
-           Installs > 10000 AND Installs <= 100000 ? 1 : 0 AS L100K,
-           Installs > 100000 AND Installs <= 1000000 ? 1 : 0 AS L1M,
-           Installs > 1000000? 1 : 0 AS G1M,
-           Installs >= 0 ? 1 : 0 AS TotalMAD28
+           ProductInstalls == 0 ? 1 : 0 AS E0,
+           ProductInstalls <= 100 ? 1 : 0 AS L100,
+           ProductInstalls > 100 AND ProductInstalls <= 500 ? 1 : 0 AS L500,
+           ProductInstalls > 500 AND ProductInstalls <= 1000 ? 1 : 0 AS L1K,
+           ProductInstalls > 1000 AND ProductInstalls <= 10000 ? 1 : 0 AS L10K,
+           ProductInstalls > 10000 AND ProductInstalls <= 100000 ? 1 : 0 AS L100K,
+           ProductInstalls > 100000 AND ProductInstalls <= 1000000 ? 1 : 0 AS L1M,
+           ProductInstalls > 1000000? 1 : 0 AS G1M,
+           ProductInstalls >= 0 ? 1 : 0 AS TotalMAD28
     FROM installsData;
 
 InstallsDistribution =

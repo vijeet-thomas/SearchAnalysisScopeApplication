@@ -4,7 +4,7 @@
 //Script GUID:8ca6bec9-7e3e-4483-9a51-0f877b295d47
 //Used for tracking history
 
-#DECLARE aggregateScoreStream1 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/07/AggregatedScore_2022_07_22.ss"; 
+#DECLARE aggregateScoreStream1 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore5_2022_08_19.ss"; 
 #DECLARE streamExpiryString string = "180";
 #DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
 
@@ -27,50 +27,50 @@ aggScore = SELECT
         b.ProductName,
             a.*
     FROM aggScore AS a 
-         INNER JOIN productNames AS b
+         LEFT JOIN productNames AS b
          ON a.ProductId == b.ProductId
     WHERE a.ProductId IS NOT NULL;
 
             
 aggScore1 =
-    SELECT TOP 500 *
+    SELECT TOP 5000 *
     FROM aggScore
     WHERE Market == "US"
-    AND ProductGroupName.Equals("AppAndGame") 
-    AND InstallsCount IS NOT NULL
-    ORDER BY InstallsCount DESC
+    AND !(ProductTypeName.Equals("TV Series") || ProductTypeName.Equals("Movie"))
+    AND MadCount IS NOT NULL
+    ORDER BY MadCount DESC
 ;
 
-aggScore2 =
-    SELECT TOP 500 *,
-           (Win32InstallCountWeb + Win32InstallCountStore) AS Win32Installs
-    FROM aggScore
-    WHERE Market == "US"
-    AND ProductGroupName.Equals("Win32")
-          AND Win32InstallCountWeb IS NOT NULL
-    AND Win32InstallCountStore IS NOT NULL
-    ORDER BY Win32Installs DESC
-;
+//aggScore2 =
+//    SELECT TOP 500 *,
+//           (Win32InstallCountWeb + Win32InstallCountStore) AS Win32Installs
+//    FROM aggScore
+//    WHERE Market == "US"
+//    AND ProductGroupName.Equals("Win32")
+//          AND Win32InstallCountWeb IS NOT NULL
+//    AND Win32InstallCountStore IS NOT NULL
+//    ORDER BY Win32Installs DESC
+//;
 
 aggScore3 =
-    SELECT TOP 500 *
+    SELECT TOP 5000 *
     FROM aggScore
     WHERE Market == "US"
     AND (ProductTypeName.Equals("TV Series") || ProductTypeName.Equals("Movie"))
-    AND PurchasesCount IS NOT NULL
-    ORDER BY PurchasesCount DESC
+    AND AggregateScore IS NOT NULL
+    ORDER BY AggregateScore DESC
 ;
 
-aggScore4 =
-    SELECT TOP 500 *
-    FROM aggScore
-    WHERE Market == "US"
-    AND ProductGroupName.Equals("Other")
-    AND InstallsCount IS NOT NULL
-    ORDER BY InstallsCount DESC
-;
+//aggScore4 =
+//    SELECT TOP 500 *
+//    FROM aggScore
+//    WHERE Market == "US"
+//    AND ProductGroupName.Equals("Other")
+//    AND InstallsCount IS NOT NULL
+//    ORDER BY InstallsCount DESC
+//;
 
-OUTPUT aggScore1 TO SSTREAM @"/users/vijeetthomas/TopInstalls/TopInstallsAppsAndGames.ss" CLUSTERED BY ProductId SORTED BY InstallsCount DESC;
-OUTPUT aggScore2 TO SSTREAM @"/users/vijeetthomas/TopInstalls/TopInstallsWin32.ss" CLUSTERED BY ProductId SORTED BY Win32Installs DESC;
-OUTPUT aggScore3 TO SSTREAM @"/users/vijeetthomas/TopInstalls/TopInstallsVideos.ss" CLUSTERED BY ProductId SORTED BY PurchasesCount DESC;
-OUTPUT aggScore4 TO SSTREAM @"/users/vijeetthomas/TopInstalls/TopInstallsOther.ss" CLUSTERED BY ProductId SORTED BY InstallsCount DESC;
+OUTPUT aggScore1 TO SSTREAM @"/users/vijeetthomas/TopApps/TopMadAppsAndGames.ss" CLUSTERED BY ProductId SORTED BY MadCount DESC;
+//OUTPUT aggScore2 TO SSTREAM @"/users/vijeetthomas/TopInstalls/TopInstallsWin32.ss" CLUSTERED BY ProductId SORTED BY Win32Installs DESC;
+OUTPUT aggScore3 TO SSTREAM @"/users/vijeetthomas/TopApps/TopScoresVideos.ss" CLUSTERED BY ProductId SORTED BY AggregateScore DESC;
+//OUTPUT aggScore4 TO SSTREAM @"/users/vijeetthomas/TopInstalls/TopInstallsOther.ss" CLUSTERED BY ProductId SORTED BY InstallsCount DESC;

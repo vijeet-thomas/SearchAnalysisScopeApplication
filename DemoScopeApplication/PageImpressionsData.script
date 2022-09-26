@@ -1,0 +1,19 @@
+﻿//Script GUID:8e9b66c7-8a51-4cf3-8644-3280e47f7fad
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+
+#DECLARE numberOfDays int = 30;
+#DECLARE startDate DateTime = @endDate.AddDays(1 - @numberOfDays);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+
+PageImpressionView =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_PageImpressions/UniversalStore_PageImpressions.view"
+    PARAMS
+    (
+        startDate = @startDate.ToString("yyyy-MM-dd"),
+        endDate = @endDate.ToString("yyyy-MM-dd")
+    );
+
+OUTPUT PageImpressionView TO SSTREAM "/users/vijeetthomas/PageImpressions/PageImpressionData.ss";

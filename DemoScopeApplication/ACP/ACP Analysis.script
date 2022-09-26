@@ -110,7 +110,3 @@ TO SSTREAM "/users/vijeetthomas/search/ACPAnalysis/SearchTermDistribution.ss"
     CLUSTERED BY SearchTerm
     SORTED BY TotalSearches DESC
    WITH STREAMEXPIRY "30";
-
-#DECLARE oldStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2021/12/AggregatedScore_2021_12_01.ss";
-#DECLARE newStream string = @"/users/vijeetthomas/search/Ratings/2021/12/AggregatedScore_2021_12_06.ss";
-

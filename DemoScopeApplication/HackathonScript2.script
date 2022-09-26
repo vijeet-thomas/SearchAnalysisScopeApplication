@@ -1,0 +1,14 @@
+﻿//Script GUID:1448391e-ecd3-4946-a460-36d739f8bcda
+//Used for tracking history
+//Script GUID:49c0d886-c774-42ce-ac82-9beeb02053f6
+//Used for tracking history
+
+#DECLARE inputStream string = @"/users/vijeetthomas/Hackathon/SearchTermProductAnalysis.ss";
+#DECLARE storageAccount string = IF("@@storageAccount@@".StartsWith("@@"), "sparkstorageaccwus2int", "@@storageAccount@@");
+#DECLARE outputStream string = @"/users/vijeetthomas/Hackathon/SearchTermProductAnalysisFiltered.ss";
+#DECLARE outputStreamCsv string = @"/users/vijeetthomas/Hackathon/SearchTermProductAnalysisFiltered.csv";
+
+input = SELECT *,MaxViews AS Searches FROM (SSTREAM @inputStream) WHERE SearchTerm IN ("chrome","google","roblox","minecraft","xbox","office","microsoft","whatsapp","halo","netflix");
+
+OUTPUT input TO SSTREAM @outputStream;
+OUTPUT input TO @outputStreamCsv USING Outputters.Csv(outputHeader : true);vius

@@ -2,8 +2,8 @@
 //Used for tracking history
 
 #DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_06.ss";
-#DECLARE inputStream2 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_08.ss";
-#DECLARE inputStream3 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_13.ss";
+#DECLARE inputStream2 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore7_2022_08_19.ss";
+#DECLARE inputStream3 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_20.ss";
 
 AgStream =
     SELECT *

@@ -27,10 +27,21 @@
     <OutputPath>bin\Release\</OutputPath>
   </PropertyGroup>
   <ItemGroup>
+    <Script Include="ACP\ACP Analysis.script" />
+    <Script Include="ACP\ACPAnalysis2.script" />
+    <Script Include="ACP\ACPAnalysis3.script" />
+    <Script Include="ACP\ACPAnalysis4.script" />
+    <Script Include="ACP\ACPAnalysis5.script" />
+    <Script Include="ACP\ACPAnalysis6.script" />
+    <Script Include="ACP\ACPCreation.script" />
+    <Script Include="ACP\ACPOnUniversalProduct.script" />
     <Script Include="AndroidRnRExtract.script" />
     <Script Include="ComparisonStream.script" />
     <Script Include="Fraud Analysis.script" />
     <Script Include="GetProductNames.script" />
+    <Script Include="hackathonEngagementPercentage.script" />
+    <Script Include="HackathonScript2.script" />
+    <Script Include="InstallsAggregation.script" />
     <Script Include="InstallsAnalysis.script" />
     <Script Include="InstallsDistributionAnalysis.script" />
     <Script Include="MADAnalysis.script" />
@@ -38,9 +49,10 @@
     <Script Include="MADCoverageCheck.script" />
     <Script Include="MADScript2.script" />
     <Script Include="MADScript3.script" />
-    <Script Include="HPC Analysis.script" />
+    <Script Include="PageImpressionsData.script" />
     <Script Include="Ratings analysis.script" />
     <Script Include="MADScript1.script" />
+    <Script Include="RatingsBaseAnalysis.script" />
     <Script Include="ScoreCheckAnalysis.script" />
     <Script Include="ScorePopularityAnalysis.script" />
     <Script Include="StoreAutoSuggestSummary.script" />
@@ -67,6 +79,12 @@
       <ScopeClusterParameters>storageAccount=(sparkstorageaccwus2prod)</ScopeClusterParameters>
       <ScopeOldParameters>storageAccount=(sparkstorageacceus2prod)</ScopeOldParameters>
     </Script>
+    <ScriptCode Include="ACP\ACPCreation.script.cs">
+      <DependentUpon>ACP\ACPCreation.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="ACP\ACPOnUniversalProduct.script.cs">
+      <DependentUpon>ACP\ACPOnUniversalProduct.script</DependentUpon>
+    </ScriptCode>
     <ScriptCode Include="AndroidRnRExtract.script.cs">
       <DependentUpon>AndroidRnRExtract.script</DependentUpon>
     </ScriptCode>
@@ -78,6 +96,15 @@
     </ScriptCode>
     <ScriptCode Include="GetProductNames.script.cs">
       <DependentUpon>GetProductNames.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="hackathonEngagementPercentage.script.cs">
+      <DependentUpon>hackathonEngagementPercentage.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="HackathonScript2.script.cs">
+      <DependentUpon>HackathonScript2.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="InstallsAggregation.script.cs">
+      <DependentUpon>InstallsAggregation.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="InstallsAnalysis.script.cs">
       <DependentUpon>InstallsAnalysis.script</DependentUpon>
@@ -91,14 +118,17 @@
     <ScriptCode Include="MADScript3.script.cs">
       <DependentUpon>MADScript3.script</DependentUpon>
     </ScriptCode>
-    <ScriptCode Include="HPC Analysis.script.cs">
-      <DependentUpon>HPC Analysis.script</DependentUpon>
+    <ScriptCode Include="PageImpressionsData.script.cs">
+      <DependentUpon>PageImpressionsData.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="Ratings analysis.script.cs">
       <DependentUpon>Ratings analysis.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="MADScript1.script.cs">
       <DependentUpon>MADScript1.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="RatingsBaseAnalysis.script.cs">
+      <DependentUpon>RatingsBaseAnalysis.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="ScoreCheckAnalysis.script.cs">
       <DependentUpon>ScoreCheckAnalysis.script</DependentUpon>
@@ -154,6 +184,9 @@
     <ScriptCode Include="WriteStreamToNewLocation.script.cs">
       <DependentUpon>WriteStreamToNewLocation.script</DependentUpon>
     </ScriptCode>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="ACP" />
   </ItemGroup>
   <Import Project="$(AppData)\Microsoft\ScopeStudio\MsBuild\1.0\Scope.targets" />
 </Project>

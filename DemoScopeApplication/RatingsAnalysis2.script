@@ -1,0 +1,133 @@
+﻿//Script GUID:06469083-2ad7-4d3a-bc48-1cd9de0693e7
+//Used for tracking history
+//Script GUID:51c5da8c-ece9-4ee6-9327-0f54da9b4144
+//Used for tracking history
+
+// Normalization Parameters 
+#DECLARE normalizedMinRange int = IF("@@normalizedMinRange@@".StartsWith("@@"), 0, int.Parse("@@normalizedMinRange@@"));
+#DECLARE normalizedMaxRange int = IF("@@normalizedMaxRange@@".StartsWith("@@"), 10000, int.Parse("@@normalizedMaxRange@@"));
+
+// --------------------------------------------------------------------------------------------------------------------
+#DECLARE streamExpiryString string = "30";
+// --------------------------------------------------------------------------------------------------------------------
+// Streams and Views
+#DECLARE RatingsStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_06.ss";
+// --------------------------------------------------------------------------------------------------------------------
+
+filteredStream =
+    SELECT ProductId, Market, RatingCountCleanedAG AS RatingCount, AggregateScore,
+           Convert.ToInt32(ProductGroupName.Equals("AppAndGame") 
+            ? (InstallsNormalizedClean + PdpViewsNormalized + 0.5 * MadCountNormalizedCleaned)/2.5
+            : ProductGroupName.Equals("Win32") 
+            ? (Win32InstallsWebNormalizedClean + Win32InstallsStoreNormalizedClean + PdpViewsNormalized + 0.075 * MadCountNormalizedCleaned)/2.075
+            : (PdpViewsNormalized + 0.5 * MadCountNormalizedCleaned)/1.5) AS AggregateScoreWithoutScoreQuality
+    FROM
+    (
+        SSTREAM @RatingsStream
+    )
+    WHERE Market == "US"
+    AND !(ProductTypeName.Equals("TV Series") || ProductTypeName.Equals("Movie"));
+
+filteredStream1  = SELECT * FROM filteredStream WHERE AggregateScoreWithoutScoreQuality == 0;
+filteredStream2  = SELECT * FROM filteredStream WHERE AggregateScoreWithoutScoreQuality < 5;
+filteredStream3  = SELECT * FROM filteredStream WHERE AggregateScoreWithoutScoreQuality < 10;
+
+videosSummary =
+    SELECT *.Except(RatingCount, AggregateScore, AggregateScoreWithoutScoreQuality),
+           (RatingCount < 10 ? 1 : 0) AS RatingCountLessThan10,
+           (RatingCount < 20 && RatingCount >= 10 ? 1 : 0) AS RatingCountLessThan20,
+           (RatingCount < 30 && RatingCount >= 20? 1 : 0) AS RatingCountLessThan30,
+           (RatingCount < 40 && RatingCount >= 30? 1 : 0) AS RatingCountLessThan40,
+           (RatingCount < 50 && RatingCount >= 40? 1 : 0) AS RatingCountLessThan50,
+           (RatingCount < 60 && RatingCount >= 50? 1 : 0) AS RatingCountLessThan60,
+           (RatingCount IS NULL OR RatingCount >= 0 ? 1 : 0) AS AllProducts
+    FROM filteredStream;
+
+videosSummary = 
+    SELECT SUM(RatingCountLessThan10) AS RatingCountLessThan10,
+           SUM(RatingCountLessThan20) AS RatingCountLessThan20,
+           SUM(RatingCountLessThan30) AS RatingCountLessThan30,
+           SUM(RatingCountLessThan40) AS RatingCountLessThan40,
+           SUM(RatingCountLessThan50) AS RatingCountLessThan50,
+           SUM(RatingCountLessThan60) AS RatingCountLessThan60,
+           SUM(AllProducts) AS AllProducts
+    FROM videosSummary;
+
+videosSummary1 =
+    SELECT *.Except(RatingCount, AggregateScore, AggregateScoreWithoutScoreQuality),
+           (RatingCount < 10 ? 1 : 0) AS RatingCountLessThan10,
+           (RatingCount < 20 && RatingCount >= 10 ? 1 : 0) AS RatingCountLessThan20,
+           (RatingCount < 30 && RatingCount >= 20? 1 : 0) AS RatingCountLessThan30,
+           (RatingCount < 40 && RatingCount >= 30? 1 : 0) AS RatingCountLessThan40,
+           (RatingCount < 50 && RatingCount >= 40? 1 : 0) AS RatingCountLessThan50,
+           (RatingCount < 60 && RatingCount >= 50? 1 : 0) AS RatingCountLessThan60,
+           (RatingCount IS NULL OR RatingCount >= 0 ? 1 : 0) AS AllProducts
+    FROM filteredStream1;
+
+videosSummary1 = 
+    SELECT SUM(RatingCountLessThan10) AS RatingCountLessThan10,
+           SUM(RatingCountLessThan20) AS RatingCountLessThan20,
+           SUM(RatingCountLessThan30) AS RatingCountLessThan30,
+           SUM(RatingCountLessThan40) AS RatingCountLessThan40,
+           SUM(RatingCountLessThan50) AS RatingCountLessThan50,
+           SUM(RatingCountLessThan60) AS RatingCountLessThan60,
+           SUM(AllProducts) AS AllProducts
+    FROM videosSummary1;
+
+videosSummary2 =
+    SELECT *.Except(RatingCount, AggregateScore, AggregateScoreWithoutScoreQuality),
+           (RatingCount < 10 ? 1 : 0) AS RatingCountLessThan10,
+           (RatingCount < 20 && RatingCount >= 10 ? 1 : 0) AS RatingCountLessThan20,
+           (RatingCount < 30 && RatingCount >= 20? 1 : 0) AS RatingCountLessThan30,
+           (RatingCount < 40 && RatingCount >= 30? 1 : 0) AS RatingCountLessThan40,
+           (RatingCount < 50 && RatingCount >= 40? 1 : 0) AS RatingCountLessThan50,
+           (RatingCount < 60 && RatingCount >= 50? 1 : 0) AS RatingCountLessThan60,
+           (RatingCount IS NULL OR RatingCount >= 0 ? 1 : 0) AS AllProductsWithAggregateScoreLessThan500
+    FROM filteredStream2;
+
+videosSummary2 = 
+    SELECT SUM(RatingCountLessThan10) AS RatingCountLessThan10,
+           SUM(RatingCountLessThan20) AS RatingCountLessThan20,
+           SUM(RatingCountLessThan30) AS RatingCountLessThan30,
+           SUM(RatingCountLessThan40) AS RatingCountLessThan40,
+           SUM(RatingCountLessThan50) AS RatingCountLessThan50,
+           SUM(RatingCountLessThan60) AS RatingCountLessThan60,
+           SUM(AllProductsWithAggregateScoreLessThan500) AS AllProductsWithAggregateScoreLessThan500
+    FROM videosSummary2;
+
+videosSummary3 =
+    SELECT *.Except(RatingCount, AggregateScore, AggregateScoreWithoutScoreQuality),
+           (RatingCount < 10 ? 1 : 0) AS RatingCountLessThan10,
+           (RatingCount < 20 && RatingCount >= 10 ? 1 : 0) AS RatingCountLessThan20,
+           (RatingCount < 30 && RatingCount >= 20? 1 : 0) AS RatingCountLessThan30,
+           (RatingCount < 40 && RatingCount >= 30? 1 : 0) AS RatingCountLessThan40,
+           (RatingCount < 50 && RatingCount >= 40? 1 : 0) AS RatingCountLessThan50,
+           (RatingCount < 60 && RatingCount >= 50? 1 : 0) AS RatingCountLessThan60,
+           (RatingCount IS NULL OR RatingCount >= 0 ? 1 : 0) AS AllProductsWithAggregateScoreLessThan1000
+    FROM filteredStream3;
+
+videosSummary3 = 
+    SELECT SUM(RatingCountLessThan10) AS RatingCountLessThan10,
+           SUM(RatingCountLessThan20) AS RatingCountLessThan20,
+           SUM(RatingCountLessThan30) AS RatingCountLessThan30,
+           SUM(RatingCountLessThan40) AS RatingCountLessThan40,
+           SUM(RatingCountLessThan50) AS RatingCountLessThan50,
+           SUM(RatingCountLessThan60) AS RatingCountLessThan60,
+           SUM(AllProductsWithAggregateScoreLessThan1000) AS AllProductsWithAggregateScoreLessThan1000
+    FROM videosSummary3;
+
+
+OUTPUT videosSummary TO SSTREAM @"/users/vijeetthomas/search/Analysis/RatingsAnalysis.ss";
+OUTPUT videosSummary1 TO SSTREAM @"/users/vijeetthomas/search/Analysis/RatingsAnalysis1.ss";
+OUTPUT videosSummary2 TO SSTREAM @"/users/vijeetthomas/search/Analysis/RatingsAnalysis2.ss";
+OUTPUT videosSummary3 TO SSTREAM @"/users/vijeetthomas/search/Analysis/RatingsAnalysis3.ss";
+/*
+    LEFT JOIN modernAppAndGameProducts AS a
+        ON p.ProductId == a.ProductId
+    
+    LEFT JOIN dimVideoProducts AS v 
+        ON p.ProductId == v.ProductId
+        
+    LEFT JOIN dimWin32Apps AS w 
+        ON p.ProductId == w.ProductId
+*/

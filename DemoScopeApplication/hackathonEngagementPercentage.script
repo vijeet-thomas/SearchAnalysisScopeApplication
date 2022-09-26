@@ -1,0 +1,96 @@
+﻿//Script GUID:a8f9cd72-74bc-4cd3-8f77-fc47989c8d30
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+
+#DECLARE numberOfDays int = 30;
+#DECLARE startDate DateTime = @endDate.AddDays(1 - @numberOfDays);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+
+//#DECLARE inputStream string = @"/users/vijeetthomas/Hackathon/UniversalStore_SearchProduct.ss";
+// This view will be used to get searches for the Month
+searchProducts =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate = @startDateString,
+        endDate = @endDateString
+    )
+;
+
+//input = SELECT * FROM (SSTREAM @inputStream);
+//
+//searchProducts =
+//    SELECT *
+//    FROM input;
+
+// Lower casing fields used for joins
+searches =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           DeviceIdFull.ToLower() AS DeviceIdFull,
+           SlotNumber,
+           IsClicked,
+           AttemptedInstalls IS NULL ? 0 : AttemptedInstalls AS AttemptedInstalls,
+           ResultingSuccessfulAcquisitions_Free IS NULL ? 0 : ResultingSuccessfulAcquisitions_Free AS ResultingSuccessfulAcquisitions_Free,
+           ResultingSuccessfulAcquisitions_Paid IS NULL ? 0 : ResultingSuccessfulAcquisitions_Paid AS ResultingSuccessfulAcquisitions_Paid,
+           ResultingSuccessfulAcquisitions_Trial IS NULL ? 0 : ResultingSuccessfulAcquisitions_Trial AS ResultingSuccessfulAcquisitions_Trial
+    FROM searchProducts
+    ;
+
+searchesViews =
+    SELECT SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           COUNT(DISTINCT DeviceIdFull) AS Views
+           //(SUM(ResultingSuccessfulAcquisitions_Free) + SUM(ResultingSuccessfulAcquisitions_Paid) + SUM(ResultingSuccessfulAcquisitions_Trial)) AS Installs
+    FROM searches;
+
+SearchTotalViews =
+    SELECT SearchTerm,
+           SUM(Views) AS TotalViews,
+           MAX(Views) AS MaxViews
+    FROM searchesViews;
+
+searchesClicks =
+    SELECT SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           COUNT(DISTINCT DeviceIdFull) AS Clicks,
+           (SUM(ResultingSuccessfulAcquisitions_Free) + SUM(ResultingSuccessfulAcquisitions_Paid) + SUM(ResultingSuccessfulAcquisitions_Trial) + SUM(AttemptedInstalls)) AS Installs
+    FROM searches
+    WHERE IsClicked == true;
+
+// Search Count for current month
+SearchesAgg = 
+    SELECT a.*,
+           b.Clicks,
+           b.Installs
+    FROM searchesViews AS a LEFT JOIN searchesClicks AS b ON a.SearchTerm == b.SearchTerm AND a.ProductId == b.ProductId AND a.ProductDisplayName == b.ProductDisplayName
+;
+
+SearchesAgg =
+    SELECT a.*.Except(Clicks,Installs),
+           a.Clicks IS NULL? 0 : a.Clicks AS Clicks,
+           a.Installs IS NULL? 0 : a.Installs AS Installs,
+           b.TotalViews,
+           b.MaxViews
+    FROM SearchesAgg AS a LEFT JOIN SearchTotalViews AS b ON a.SearchTerm == b.SearchTerm;
+
+SearchesAggFinal =
+    SELECT *,
+           Installs * 100.0 / Views AS InstallsToViewsPercentage,
+           Clicks * 100.0 / Views AS ClicksToViewsPercentage,
+           Installs * 100.0 / Clicks AS InstallsToClicksPercentage,
+           Views * 100.0 / TotalViews AS ViewsToTotalViewsPercentage,
+           Views * 100.0 / MaxViews AS ViewsToMaxViewsPercentage
+    FROM SearchesAgg; 
+
+OUTPUT SearchTotalViews TO SSTREAM @"/users/vijeetthomas/Hackathon/TopSearchTermsByViews.ss" 
+  CLUSTERED BY SearchTerm
+        SORTED BY TotalViews DESC;
+OUTPUT SearchesAggFinal TO SSTREAM @"/users/vijeetthomas/Hackathon/SearchTermProductAnalysis.ss"
+CLUSTERED BY SearchTerm, ProductId, ProductDisplayName 
+        SORTED BY TotalViews DESC, Installs DESC;

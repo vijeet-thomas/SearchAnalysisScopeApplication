@@ -1,0 +1,64 @@
+﻿//Script GUID:83e0b61f-6145-4a2a-a7db-df65a3dfad9b
+//Used for tracking history
+
+//Script GUID:37947203-5b8c-4769-bff8-ae2340ee8fef
+//Used for tracking history
+
+//Script GUID:03c2bf3d-a016-4ca9-b588-d375e1de0773
+//Used for tracking history
+
+#DECLARE inputStream1 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_06.ss";
+#DECLARE inputStream2 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_20.ss";
+#DECLARE inputStream3 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/nikg/FraudDetection/ProductDetailsFraudPercent50TOP500.ss";
+
+oldStream1 =
+    SELECT ProductId, Market, AggregateScore
+    FROM
+    (
+        SSTREAM @inputStream1
+    )
+    WHERE Market == "US";
+
+//newStream2 =
+//    SELECT ProductId, Market, AggregateScore
+//    FROM
+//    (
+//        SSTREAM @inputStream2
+//    )
+//    WHERE Market == "US";
+
+fraudStream =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputStream3
+    );
+
+streamCompare =
+    SELECT a.ProductId,
+           a.Market,
+           a.AggregateScore
+    FROM oldStream1 AS a
+    INNER JOIN
+        fraudStream AS c
+        ON a.ProductId == c.ProductId;
+
+#DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+
+productNames =
+SELECT *
+FROM
+(
+    SSTREAM @productNameMapper
+);
+
+streamCompare = 
+    SELECT a.*, b.ProductName
+    FROM streamCompare AS a 
+         LEFT JOIN productNames AS b
+         ON a.ProductId == b.ProductId
+    WHERE a.ProductId IS NOT NULL;
+
+
+OUTPUT streamCompare
+TO SSTREAM "/users/vijeetthomas/RelevanceScore/FraudAnalysis/AggregatedScoreFraud.ss";

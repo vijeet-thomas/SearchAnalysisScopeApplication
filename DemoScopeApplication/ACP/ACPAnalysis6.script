@@ -1,0 +1,71 @@
+﻿//Script GUID:9744a837-1f7f-4cd1-b48c-58f57ae4a3c0
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+
+#DECLARE numberOfDays int = 30;
+#DECLARE startDate DateTime = @endDate.AddDays(1 - @numberOfDays);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+
+// This view will be used to get searches for the Month
+searchProducts =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate = @startDateString,
+        endDate = @endDateString
+    )
+;
+
+searchProducts = SELECT * FROM searchProducts 
+          WHERE !string.IsNullOrEmpty(DeviceIdFull)
+          AND !string.IsNullOrEmpty(SearchTerm)
+          AND IsTest!= 1  
+          AND IsFinalSearch 
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND IsClicked == true
+;
+
+// Lower casing fields used for joins
+searches =
+    SELECT DateId,
+           SearchTerm.ToLower().Trim() AS SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           DeviceIdFull.ToLower() AS DeviceIdFull,
+           SlotNumber,
+           ResultingSuccessfulAcquisitions_Free,
+           ResultingSuccessfulAcquisitions_Paid
+    FROM searchProducts
+    ;
+
+// Search Count for current month
+SearchesProdAgg = 
+    SELECT DateId,
+           SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           COUNT(DISTINCT DeviceIdFull) AS SearchCount,
+           AVG (SlotNumber) AS ACP,
+           (SUM (ResultingSuccessfulAcquisitions_Free) + SUM (ResultingSuccessfulAcquisitions_Paid)) AS Installs
+    FROM searches
+    ;
+
+SearchesAgg = 
+    SELECT DateId,
+           SearchTerm,
+           COUNT(DISTINCT DeviceIdFull) AS SearchCount,
+           AVG (SlotNumber) AS ACP,
+           (SUM (ResultingSuccessfulAcquisitions_Free) + SUM (ResultingSuccessfulAcquisitions_Paid)) AS Installs
+    FROM searches
+    ;
+
+OUTPUT SearchesAgg TO SSTREAM @"/users/vijeetthomas/ACPAnalysis3/SearchTermAnalysisFromUniProd.ss"
+CLUSTERED BY DateId, SearchTerm 
+        SORTED BY SearchCount DESC, ACP DESC;
+
+OUTPUT SearchesProdAgg TO SSTREAM @"/users/vijeetthomas/ACPAnalysis3/SearchTermProductAnalysisFromUniProd.ss"
+CLUSTERED BY DateId, SearchTerm, ProductId, ProductDisplayName 
+        SORTED BY SearchCount DESC, ACP DESC;

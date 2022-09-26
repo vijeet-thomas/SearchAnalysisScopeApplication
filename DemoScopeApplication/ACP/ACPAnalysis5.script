@@ -1,0 +1,114 @@
+﻿//Script GUID:851862ca-2e08-41f1-8c0c-3c1c6418ba8e
+//Used for tracking history
+
+#DECLARE inputStream string = @"/users/vijeetthomas/search/ACPAnalysis2/SearchTermAnalysis.ss";
+#DECLARE inputStream2 string = @"/users/vijeetthomas/search/ACPAnalysis2/SearchTermToProductAnalysis.ss";
+
+#DECLARE inputStreama string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermAnalysisFromUniProd.ss";
+#DECLARE inputStreama2 string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermProductAnalysisFromUniProd.ss";
+input =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputStreama
+    )
+    WHERE (DateId == 20220824 OR DateId == 20220909)
+    ;
+
+//termChange =
+//    SELECT DateId == 20220824 ? "Date Group 1" : DateId == 20220904 ?  "Date Group 2" : "Other" AS DateGroup,
+//           SearchTerm.ToLower() AS SearchTerm,
+//           ACP ,
+//           SearchCount ,
+//           SumSearchPositions
+//    FROM input
+//;
+
+termChange1  = SELECT DISTINCT * FROM input
+    WHERE DateId == 20220824;
+
+termChange2  = SELECT DISTINCT * FROM input
+                              WHERE DateId == 20220909;
+
+termChangeSummary =
+    SELECT a.SearchTerm,
+           a.ACP AS OldACP,
+           a.SearchCount AS OldSearchCount,
+           a.Installs AS OldInstalls,
+           b.ACP AS NewACP,
+           b.SearchCount AS NewSearchCount,
+           b.Installs AS NewInstalls
+    FROM termChange1 AS a
+    INNER JOIN
+        termChange2 AS b
+        ON a.SearchTerm == b.SearchTerm;
+
+termChangeSummary =
+    SELECT *,
+           (NewSearchCount - OldSearchCount) AS SearchCountDiff,
+           (NewACP - OldACP) AS ACPDiff,
+           Math.Abs(Convert.ToInt32(NewSearchCount - OldSearchCount)) AS AbsSearchCountDiff,
+           Math.Abs(Convert.ToInt32(NewACP - OldACP)) AS AbsACPDiff
+    FROM termChangeSummary;
+
+
+OUTPUT termChangeSummary TO SSTREAM "/users/vijeetthomas/ACPAnalysis3/SearchTermsChangesFromUniProd.ss"
+    CLUSTERED BY SearchTerm
+    SORTED BY OldSearchCount DESC, AbsACPDiff DESC;
+
+OUTPUT termChangeSummary TO "/users/vijeetthomas/ACPAnalysis3/SearchTermsChangesFromUniProd.csv" USING Outputters.Csv(outputHeader : true)
+;
+
+input2 =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputStreama2
+    )
+    WHERE DateId == 20220824 OR DateId == 20220909;
+//
+//termProductChange =
+//    SELECT DateId == 20220824 ? "Date Group 1" : DateId == 20220904 ?  "Date Group 2" : "Other" AS DateGroup,
+//           SearchTerm.ToLower() AS SearchTerm,
+//           ProductId,
+//           ProductName,
+//           ACP,
+//           SearchCount,
+//           SumSearchPositions
+//    FROM input2;
+
+termProduct1  = SELECT DISTINCT * FROM input2
+    WHERE DateId == 20220824;
+
+
+termProduct2  = SELECT DISTINCT * FROM input2
+    WHERE DateId == 20220909;
+
+termProductSummary =
+    SELECT a.SearchTerm,
+           a.ProductId,
+           a.ProductDisplayName,
+           a.ACP AS OldACP,
+           a.Installs AS OldInstalls,
+           a.SearchCount AS OldSearchCount,
+           b.ACP AS NewACP,
+           b.SearchCount AS NewSearchCount,
+           b.Installs AS NewInstalls
+    FROM termProduct1 AS a
+    INNER JOIN
+        termProduct2 AS b
+        ON a.SearchTerm == b.SearchTerm AND a.ProductId == b.ProductId AND a.ProductDisplayName == b.ProductDisplayName;
+
+termProductSummary =
+    SELECT *,
+           (NewSearchCount - OldSearchCount) AS SearchCountDiff,
+           (NewACP - OldACP) AS ACPDiff,
+           Math.Abs(Convert.ToInt32(NewSearchCount - OldSearchCount)) AS AbsSearchCountDiff,
+           Math.Abs(Convert.ToInt32(NewACP - OldACP)) AS AbsACPDiff
+    FROM termProductSummary;
+
+OUTPUT termProductSummary TO SSTREAM "/users/vijeetthomas/ACPAnalysis3/SearchTermsAndProductsChangesFromUniProd.ss"
+    CLUSTERED BY SearchTerm, ProductId, ProductDisplayName
+    SORTED BY OldSearchCount DESC, AbsACPDiff DESC;
+
+OUTPUT termProductSummary TO "/users/vijeetthomas/ACPAnalysis3/SearchTermsAndProductsChangesFromUniProd.csv" USING Outputters.Csv(outputHeader : true);

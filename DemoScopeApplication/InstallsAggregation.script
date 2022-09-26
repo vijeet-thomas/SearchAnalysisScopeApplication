@@ -1,0 +1,28 @@
+﻿//Script GUID:12cfcbe5-030b-4697-a159-af6172566432
+//Used for tracking history
+
+#DECLARE timePeriodDays int = 175;
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-8), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate DateTime = @endDate.AddDays( - (@timePeriodDays - 1));
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+
+// Input Streams and Views
+#DECLARE inputRoot string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/";
+#DECLARE installsPattern string = @"/%Y/%m/AttemptedInstallsByProductidMarket_%Y_%m_%d.ss";
+
+installs =
+    (
+    SSTREAM STREAMSET @inputRoot
+            PATTERN @installsPattern
+            RANGE __date = [@startDateString, @endDateString]
+    );
+
+installsByProductMarket =
+    SELECT ProductId,
+           Market,
+           SUM(Installs) AS InstallsCount
+    FROM installs
+    WHERE !string.IsNullOrWhiteSpace(ProductId);
+
+OUTPUT installsByProductMarket TO SSTREAM @"/users/vijeetthomas/Installs/InstallData.ss";

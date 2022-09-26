@@ -8,7 +8,7 @@
 #DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/2022/07/AndroidRatings_2022_07_14.ss";
 #DECLARE outputStream string = @"/users/vijeetthomas/RelevanceScore/AndroidRatings/2022/07/AndroidRatings_2022_07_14.ss";
 #DECLARE streamExpiryString string = "180";
-#DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+
 
 input =
 SELECT *
@@ -17,7 +17,7 @@ FROM
     SSTREAM @inputStream
 );
 
-
+#DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
 productNames =
 SELECT *
 FROM

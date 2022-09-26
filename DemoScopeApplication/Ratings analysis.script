@@ -93,26 +93,26 @@ videosSummary =
     SELECT *,
            (RatingCount == 0? 1 : 0) AS RatingCountZero,
            (RatingCount <= 5 && RatingCount > 0 ? 1 : 0) AS RatingCountLessThan5,
-           (RatingCount <= 20 && RatingCount > 5 ? 1 : 0) AS RatingCountLessThan20,
-           (RatingCount <= 100 && RatingCount > 20 ? 1 : 0) AS RatingCountLessThan100,
-           (RatingCount <= 1000 && RatingCount > 100? 1 : 0) AS RatingCountLessThan1000,
-           (RatingCount <= 2000 && RatingCount > 1000? 1 : 0) AS RatingCountLessThan2000,
-           (RatingCount <= 100000 && RatingCount > 2000? 1 : 0) AS RatingCountLessThan100000,
-           (RatingCount > 100000 ? 1 : 0) AS RatingCountGreaterThan100000
+           (RatingCount <= 10 && RatingCount > 5 ? 1 : 0) AS RatingCountLessThan10,
+           (RatingCount <= 20 && RatingCount > 10 ? 1 : 0) AS RatingCountLessThan20,
+           (RatingCount <= 30 && RatingCount > 20? 1 : 0) AS RatingCountLessThan30,
+           (RatingCount <= 40 && RatingCount > 30? 1 : 0) AS RatingCountLessThan40,
+           (RatingCount <= 50 && RatingCount > 40? 1 : 0) AS RatingCountLessThan50,
+           (RatingCount <= 100 && RatingCount > 50? 1 : 0) AS RatingCountGreaterThan100
     FROM filteredRatings;
 
 videosSummary = 
     SELECT SUM(RatingCountZero) AS RatingCountZero,
            SUM(RatingCountLessThan5) AS RatingCountLessThan5,
+           SUM(RatingCountLessThan10) AS RatingCountLessThan10,
            SUM(RatingCountLessThan20) AS RatingCountLessThan20,
-           SUM(RatingCountLessThan100) AS RatingCountLessThan100,
-           SUM(RatingCountLessThan1000) AS RatingCountLessThan1000,
-           SUM(RatingCountLessThan2000) AS RatingCountLessThan2000,
-           SUM(RatingCountLessThan100000) AS RatingCountLessThan100000,
-           SUM(RatingCountGreaterThan100000) AS RatingCountGreaterThan100000
+           SUM(RatingCountLessThan30) AS RatingCountLessThan30,
+           SUM(RatingCountLessThan40) AS RatingCountLessThan40,
+           SUM(RatingCountLessThan50) AS RatingCountLessThan50,
+           SUM(RatingCountGreaterThan100) AS RatingCountGreaterThan100
     FROM videosSummary;
 
-OUTPUT videosSummary TO SSTREAM @"/users/vijeetthomas/search/Analysis/RatingsAnalysis.ss";
+OUTPUT videosSummary TO SSTREAM @"/users/vijeetthomas/search/Analysis/RatingsAnalysisTV.ss";
 /*
     LEFT JOIN modernAppAndGameProducts AS a
         ON p.ProductId == a.ProductId

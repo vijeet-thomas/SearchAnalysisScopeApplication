@@ -1,10 +1,11 @@
 ﻿//Script GUID:49c0d886-c774-42ce-ac82-9beeb02053f6
 //Used for tracking history
 
-#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/07/AggregatedScore_2022_07_11.ss";
+#DECLARE inputStream string = @"/users/vijeetthomas/Hackathon/SearchTermProductAnalysis.ss";
 #DECLARE storageAccount string = IF("@@storageAccount@@".StartsWith("@@"), "sparkstorageaccwus2int", "@@storageAccount@@");
-#DECLARE outputStream string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/Ingestion/{0}/AggregatedScoreIngested.ss", @storageAccount);
+#DECLARE outputStream string = @"/users/vijeetthomas/Hackathon/SearchTermProductAnalysis.csv";
 
 input = SELECT * FROM (SSTREAM @inputStream);
 
-OUTPUT input TO SSTREAM @outputStream WITH STREAMEXPIRY "180";
+//OUTPUT input TO SSTREAM @outputStream WITH STREAMEXPIRY "10";
+OUTPUT input TO @outputStream USING Outputters.Csv(outputHeader : true);
