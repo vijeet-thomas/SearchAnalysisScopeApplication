@@ -41,20 +41,20 @@ PageImpressionView =
 PageImpressionsData = 
     SELECT 
 UserIdFull,
-CountryCode,
+CountryCode AS Market,
 DeviceIdFull,
-Ref_SearchBox_Query,
+Ref_SearchBox_Query AS SearchTerm,
 ProductIdFull,
 ProductId,
 Content,
 Actions,
-AppId,
-AppVersion,
-SessionGuid,
-PageImpressionGuid,
-Market,
-VisitDurationInSec,
-ActiveVisitDurationInSec,
+//AppId,
+//AppVersion,
+//SessionGuid,
+//PageImpressionGuid,
+//Market,
+//VisitDurationInSec,
+//ActiveVisitDurationInSec,
 ProductType,
 SuccessfulAcquisitions_Free,
 SuccessfulAcquisitions_Paid,
@@ -62,17 +62,27 @@ SuccessfulAcquisitions_Trial,
 SuccessfulAcquisitions_Gift,
 AttemptedInstalls,
 AttemptedAcquisitions_Total,
-Nav_Product_ContentSource,
+//Nav_Product_ContentSource,
 Nav_Product_AreaType,
-OSSkuId,
-OSSkuFriendlyName,
-DateId,
-GlobalPageId,
-GlobalSessionId
+//OSSkuId,
+//OSSkuFriendlyName,
+DateId
+//GlobalPageId,
+//GlobalSessionId
     
     FROM PageImpressionView WHERE PageType == "SearchPageLayout";
 
 OUTPUT PageImpressionsData TO SSTREAM "/users/vijeetthomas/PageImpressions/PageImpressionData.ss";
+
+pageData =
+SELECT *.Except(Content, Actions),
+       JsonConvert.DeserializeObject<List<SearchResultsJson>>(Content) AS SearchResultData,
+       JsonConvert.DeserializeObject<List<SearchActionsJson>>(Actions) AS SearchActionsData
+FROM PageImpressionsData
+WHERE !string.IsNullOrWhiteSpace(Content) AND Content != "[]"
+    AND !string.IsNullOrWhiteSpace(Actions) AND Actions != "[]";
+
+OUTPUT pageData TO SSTREAM "/users/vijeetthomas/PageImpressions/PageData.ss";
 
 //ContentType = 4 --> Search Results
 #CS
@@ -92,5 +102,12 @@ class SearchResultsJson {
 class SearchActionsJson {
     // { "contentType": "0", "slotNumber": "0", "contentName": "Installeren", "contentId": "installButton", "contentSource": "HCR", "areaName": "pdpButtonPanel", "product": "XP8BT8DW290MPQ", "actions": "2", "behavior": "-17", "seq": "34;63" }
     //behaviour = -17 --> install, behaviour = -6 --> purchase
+    int contentType;
+    int slotNumber;
+    string contentName;
+    string contentSource;
+    string areaName;
+    string product;
+    int behavior;
 }
 #ENDCS
