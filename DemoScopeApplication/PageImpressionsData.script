@@ -86,28 +86,59 @@ OUTPUT pageData TO SSTREAM "/users/vijeetthomas/PageImpressions/PageData.ss";
 
 //ContentType = 4 --> Search Results
 #CS
-class SearchResultsJson {
+    
+public static class RatingUtils 
+{
+    public static string GetRatingPerMarket(List<SearchResultsJson> searchResults, string ProductId, string Catalog, string PartnerProductId) {
+        return string.Join(",", result);
+    }
+}
+
+public class SearchResultsJson {
 
     // "contentType": "4", "slotNumber": "7", "contentName": "Up A Notch", "contentSource": "Organic", "areaName": "SearchVerticalTileList", "product": "msa:9NNS08N6T354", "impressions": "1", "seq": "63" },
+    [JsonProperty("contentType")]
     int contentType;
+    
+    [JsonProperty("slotNumber")]
     int slotNumber;
+
+    [JsonProperty("contentName")]
     string contentName;
+    
+    [JsonProperty("contentSource")]
     string contentSource;
+    
+    [JsonProperty("areaName")]
     string areaName;
+    
+    [JsonProperty("product")]
     string product;
-    int impressions;
-    int seq;
+    
 } 
 
-class SearchActionsJson {
+public class SearchActionsJson {
     // { "contentType": "0", "slotNumber": "0", "contentName": "Installeren", "contentId": "installButton", "contentSource": "HCR", "areaName": "pdpButtonPanel", "product": "XP8BT8DW290MPQ", "actions": "2", "behavior": "-17", "seq": "34;63" }
     //behaviour = -17 --> install, behaviour = -6 --> purchase
+    [JsonProperty("contentType")]
     int contentType;
+    
+    [JsonProperty("slotNumber")]
     int slotNumber;
+
+    [JsonProperty("contentName")]
     string contentName;
+    
+    [JsonProperty("contentSource")]
     string contentSource;
+    
+    [JsonProperty("areaName")]
     string areaName;
+    
+    [JsonProperty("product")]
     string product;
+
+    [JsonProperty("behavior")]
     int behavior;
 }
 #ENDCS
