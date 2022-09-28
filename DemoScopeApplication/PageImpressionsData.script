@@ -1,13 +1,35 @@
 ﻿//Script GUID:8e9b66c7-8a51-4cf3-8644-3280e47f7fad
 //Used for tracking history
 
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// Nebula parameters
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+SET @@FeaturePreviews = "EnableJsonOperators:on,EnableJsonIntrinsics:on";
+
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// NGP Tagging Module
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// References
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/Libraries/netstandard.dll";
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/Libraries/Newtonsoft.Json.dll";
+USING Newtonsoft.Json;
+USING Newtonsoft.Json.Converters;
+USING Newtonsoft.Json.Linq;
+
+//Date Parameters
 #DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
 
-#DECLARE numberOfDays int = 30;
+#DECLARE numberOfDays int = 1;
 #DECLARE startDate DateTime = @endDate.AddDays(1 - @numberOfDays);
 #DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
 #DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
 
+//Script
 PageImpressionView =
     VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_PageImpressions/UniversalStore_PageImpressions.view"
     PARAMS
@@ -16,4 +38,59 @@ PageImpressionView =
         endDate = @endDate.ToString("yyyy-MM-dd")
     );
 
-OUTPUT PageImpressionView TO SSTREAM "/users/vijeetthomas/PageImpressions/PageImpressionData.ss";
+PageImpressionsData = 
+    SELECT 
+UserIdFull,
+CountryCode,
+DeviceIdFull,
+Ref_SearchBox_Query,
+ProductIdFull,
+ProductId,
+Content,
+Actions,
+AppId,
+AppVersion,
+SessionGuid,
+PageImpressionGuid,
+Market,
+VisitDurationInSec,
+ActiveVisitDurationInSec,
+ProductType,
+SuccessfulAcquisitions_Free,
+SuccessfulAcquisitions_Paid,
+SuccessfulAcquisitions_Trial,
+SuccessfulAcquisitions_Gift,
+AttemptedInstalls,
+AttemptedAcquisitions_Total,
+Nav_Product_ContentSource,
+Nav_Product_AreaType,
+OSSkuId,
+OSSkuFriendlyName,
+DateId,
+GlobalPageId,
+GlobalSessionId
+    
+    FROM PageImpressionView WHERE PageType == "SearchPageLayout";
+
+OUTPUT PageImpressionsData TO SSTREAM "/users/vijeetthomas/PageImpressions/PageImpressionData.ss";
+
+//ContentType = 4 --> Search Results
+#CS
+class SearchResultsJson {
+
+    // "contentType": "4", "slotNumber": "7", "contentName": "Up A Notch", "contentSource": "Organic", "areaName": "SearchVerticalTileList", "product": "msa:9NNS08N6T354", "impressions": "1", "seq": "63" },
+    int contentType;
+    int slotNumber;
+    string contentName;
+    string contentSource;
+    string areaName;
+    string product;
+    int impressions;
+    int seq;
+} 
+
+class SearchActionsJson {
+    // { "contentType": "0", "slotNumber": "0", "contentName": "Installeren", "contentId": "installButton", "contentSource": "HCR", "areaName": "pdpButtonPanel", "product": "XP8BT8DW290MPQ", "actions": "2", "behavior": "-17", "seq": "34;63" }
+    //behaviour = -17 --> install, behaviour = -6 --> purchase
+}
+#ENDCS

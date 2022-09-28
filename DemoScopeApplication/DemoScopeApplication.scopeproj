@@ -7,7 +7,7 @@
     <OutputType>File</OutputType>
     <AssemblyName>Algebra.xml</AssemblyName>
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>DemoScopeApplication</Name>
     <RootNamespace>DemoScopeApplication</RootNamespace>
     <VCSelectionInProjectProperty>&lt;Use Current VC in VC Selector&gt;</VCSelectionInProjectProperty>
@@ -17,6 +17,7 @@
     <VertexDebugSolution>false</VertexDebugSolution>
     <BuildNScripts>False</BuildNScripts>
     <NScriptsToBuild />
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -33,6 +34,7 @@
     <Script Include="ACP\ACPAnalysis4.script" />
     <Script Include="ACP\ACPAnalysis5.script" />
     <Script Include="ACP\ACPAnalysis6.script" />
+    <Script Include="ACP\ACPAnalysis7.script" />
     <Script Include="ACP\ACPCreation.script" />
     <Script Include="ACP\ACPOnUniversalProduct.script" />
     <Script Include="AndroidRnRExtract.script" />
@@ -79,6 +81,9 @@
       <ScopeClusterParameters>storageAccount=(sparkstorageaccwus2prod)</ScopeClusterParameters>
       <ScopeOldParameters>storageAccount=(sparkstorageacceus2prod)</ScopeOldParameters>
     </Script>
+    <ScriptCode Include="ACP\ACPAnalysis7.script.cs">
+      <DependentUpon>ACP\ACPAnalysis7.script</DependentUpon>
+    </ScriptCode>
     <ScriptCode Include="ACP\ACPCreation.script.cs">
       <DependentUpon>ACP\ACPCreation.script</DependentUpon>
     </ScriptCode>

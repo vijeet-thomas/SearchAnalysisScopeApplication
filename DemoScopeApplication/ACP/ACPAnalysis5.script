@@ -12,7 +12,7 @@ input =
     (
         SSTREAM @inputStreama
     )
-    WHERE (DateId == 20220824 OR DateId == 20220909)
+    WHERE (DateId == 20220815 OR DateId == 20220915)
     ;
 
 //termChange =
@@ -25,10 +25,10 @@ input =
 //;
 
 termChange1  = SELECT DISTINCT * FROM input
-    WHERE DateId == 20220824;
+    WHERE DateId == 20220815;
 
 termChange2  = SELECT DISTINCT * FROM input
-                              WHERE DateId == 20220909;
+                              WHERE DateId == 20220915;
 
 termChangeSummary =
     SELECT a.SearchTerm,
@@ -65,7 +65,7 @@ input2 =
     (
         SSTREAM @inputStreama2
     )
-    WHERE DateId == 20220824 OR DateId == 20220909;
+    WHERE DateId == 20220815 OR DateId == 20220915;
 //
 //termProductChange =
 //    SELECT DateId == 20220824 ? "Date Group 1" : DateId == 20220904 ?  "Date Group 2" : "Other" AS DateGroup,
@@ -78,11 +78,11 @@ input2 =
 //    FROM input2;
 
 termProduct1  = SELECT DISTINCT * FROM input2
-    WHERE DateId == 20220824;
+    WHERE DateId == 20220815;
 
 
 termProduct2  = SELECT DISTINCT * FROM input2
-    WHERE DateId == 20220909;
+    WHERE DateId == 20220915;
 
 termProductSummary =
     SELECT a.SearchTerm,

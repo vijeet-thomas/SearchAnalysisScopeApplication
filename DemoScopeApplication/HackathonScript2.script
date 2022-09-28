@@ -11,4 +11,4 @@
 input = SELECT *,MaxViews AS Searches FROM (SSTREAM @inputStream) WHERE SearchTerm IN ("chrome","google","roblox","minecraft","xbox","office","microsoft","whatsapp","halo","netflix");
 
 OUTPUT input TO SSTREAM @outputStream;
-OUTPUT input TO @outputStreamCsv USING Outputters.Csv(outputHeader : true);vius
+OUTPUT input TO @outputStreamCsv USING Outputters.Csv(outputHeader : true);

@@ -3,7 +3,7 @@
 
 #DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
 
-#DECLARE numberOfDays int = 30;
+#DECLARE numberOfDays int = 45;
 #DECLARE startDate DateTime = @endDate.AddDays(1 - @numberOfDays);
 #DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
 #DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
@@ -28,7 +28,6 @@ searchProducts = SELECT * FROM searchProducts
           AND IsClicked == true
 ;
 
-// Lower casing fields used for joins
 searches =
     SELECT DateId,
            SearchTerm.ToLower().Trim() AS SearchTerm,
