@@ -28,6 +28,7 @@
     <OutputPath>bin\Release\</OutputPath>
   </PropertyGroup>
   <ItemGroup>
+    <Script Include="01_TopStoreSearches.script" />
     <Script Include="ACP\ACP Analysis.script" />
     <Script Include="ACP\ACPAnalysis2.script" />
     <Script Include="ACP\ACPAnalysis3.script" />
@@ -35,8 +36,7 @@
     <Script Include="ACP\ACPAnalysis5.script" />
     <Script Include="ACP\ACPAnalysis6.script" />
     <Script Include="ACP\ACPAnalysis7.script" />
-    <Script Include="ACP\ACPCreation.script" />
-    <Script Include="ACP\ACPOnUniversalProduct.script" />
+    <Script Include="ACP\ACPTop1500SearchTerms.script" />
     <Script Include="AndroidRnRExtract.script" />
     <Script Include="ComparisonStream.script" />
     <Script Include="Fraud Analysis.script" />
@@ -52,9 +52,12 @@
     <Script Include="MADScript2.script" />
     <Script Include="MADScript3.script" />
     <Script Include="PageImpressionsData.script" />
+    <Script Include="PerProductDetails.script" />
+    <Script Include="Product.script" />
     <Script Include="Ratings analysis.script" />
     <Script Include="MADScript1.script" />
     <Script Include="RatingsBaseAnalysis.script" />
+    <Script Include="Scope.script" />
     <Script Include="ScoreCheckAnalysis.script" />
     <Script Include="ScorePopularityAnalysis.script" />
     <Script Include="StoreAutoSuggestSummary.script" />
@@ -81,14 +84,14 @@
       <ScopeClusterParameters>storageAccount=(sparkstorageaccwus2prod)</ScopeClusterParameters>
       <ScopeOldParameters>storageAccount=(sparkstorageacceus2prod)</ScopeOldParameters>
     </Script>
+    <ScriptCode Include="01_TopStoreSearches.script.cs">
+      <DependentUpon>01_TopStoreSearches.script</DependentUpon>
+    </ScriptCode>
     <ScriptCode Include="ACP\ACPAnalysis7.script.cs">
       <DependentUpon>ACP\ACPAnalysis7.script</DependentUpon>
     </ScriptCode>
-    <ScriptCode Include="ACP\ACPCreation.script.cs">
-      <DependentUpon>ACP\ACPCreation.script</DependentUpon>
-    </ScriptCode>
-    <ScriptCode Include="ACP\ACPOnUniversalProduct.script.cs">
-      <DependentUpon>ACP\ACPOnUniversalProduct.script</DependentUpon>
+    <ScriptCode Include="ACP\ACPTop1500SearchTerms.script.cs">
+      <DependentUpon>ACP\ACPTop1500SearchTerms.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="AndroidRnRExtract.script.cs">
       <DependentUpon>AndroidRnRExtract.script</DependentUpon>

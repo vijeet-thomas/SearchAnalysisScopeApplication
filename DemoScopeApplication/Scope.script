@@ -1,0 +1,245 @@
+﻿//Script GUID:1397f270-1dc4-4885-a9be-fa6b377376be
+//Used for tracking history
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Common/Microsoft.Telemetry.Common.Utilities.dll";
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Census/Microsoft.Telemetry.Device.Census.dll";
+
+USING Microsoft.Telemetry.Device.Census;
+USING Microsoft.Telemetry.Common.Utilities;
+
+[PIN]REFERENCE @"shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.OSG.OneStore.DnA.Cosmos.DynamicViewResolver.dll";
+[PIN]REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/SchemaAdjuster/Microsoft.Telemetry.Common.SchemaAdjuster.dll";
+
+MODULE "/shares/asimov.prod.data/Public/Resources/Latest/Dimensions/CommonDimensions.module" AS CommonDimensions;
+
+#DECLARE PrivacyAnnotationPath string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/NGP/Resources/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+#DECLARE inputRnRStream string = "/shares/asimov.prod.data/PublicPartner/Processed/DSXRatings/prod/cooked/dataForPartners/V2/MasterReviews/MasterReviews.ss";
+#DECLARE inputProductStream string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+#DECLARE inputProductInstallStream string = "/users/vijeetthomas/Installs/InstallData.ss";
+#DECLARE inputProductEngagementStream string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_23.ss";
+#DECLARE inputMSIVCInstallStream string = "/shares/asimov.prod.data/PublicPartner/Processed/StoreUsage/MSIXVC/KPI/2022/09/11/Aggregates_2022_09_11.ss";
+
+#DECLARE outputStream string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/nikg/FraudDetection/RatingsAndReviewsByMonthsProductId_Store21.ss";
+#DECLARE outputByProduct string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/nikg/FraudDetection/OutputByProduct.csv";
+#DECLARE outputByMonth string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/nikg/FraudDetection/OutputByMonth.csv";
+
+
+products =
+    SELECT ProductId, ProductName
+    FROM
+    (
+        SSTREAM @inputProductStream
+    );
+
+allRatingsNReviews =
+    SELECT *
+    FROM (SSTREAM @inputRnRStream);
+
+allRatingsNReviewsMonth =
+    SELECT ProductId,
+           products.ProductName AS ProductName,
+           Rating,
+           SubmittedDateTime.ToString("yyyyMM") AS Month,
+           IsFraudulent,
+           (!ScriptHelper.IsNullOrEmpty(UnmoderatedReviewText) || !ScriptHelper.IsNullOrEmpty(ModeratedReviewText)) AS HasReviewText,
+           (!ScriptHelper.IsNullOrEmpty(UnmoderatedReviewTitle) || !ScriptHelper.IsNullOrEmpty(ModeratedReviewTitle)) AS HasReviewTitle
+    FROM allRatingsNReviews    
+    INNER JOIN
+        products
+        ON products.ProductId == allRatingsNReviews.ProductId;
+
+allRatingsNReviewsMonthFilter =
+    SELECT *
+    FROM allRatingsNReviewsMonth
+    WHERE Month IN ("202203", "202204", "202205", "202206", "202207", "202208");
+
+allRatingsNReviewsFraud =
+    SELECT *
+    FROM allRatingsNReviewsMonthFilter
+    WHERE IsFraudulent == true;
+
+allRatingsNReviewsNonFraud =
+    SELECT *
+    FROM allRatingsNReviewsMonthFilter
+    WHERE IsFraudulent != true;
+
+allRatingsNReviewsFraudByMonth =
+   SELECT Month,
+           COUNT(*) AS Total,
+           COUNTIF(HasReviewText == true) AS ReviewTextCount,
+           COUNTIF(HasReviewTitle == true) AS ReviewTitleCount,
+           SUM(Rating) AS TotalRatingSum
+    FROM allRatingsNReviewsFraud
+    GROUP BY Month;
+
+allRatingsNReviewsNonFraudByMonth =
+   SELECT Month,
+           COUNT(*) AS Total,
+           COUNTIF(HasReviewText == true) AS ReviewTextCount,
+           COUNTIF(HasReviewTitle == true) AS ReviewTitleCount,
+           SUM(Rating) AS TotalRatingSum
+    FROM allRatingsNReviewsNonFraud
+    GROUP BY Month;
+
+allRatingsNReviewsAllByMonth =
+   SELECT Month,
+           COUNT(*) AS Total,
+           COUNTIF(IsFraudulent == true) AS FraudCount,
+           COUNTIF(HasReviewText == true) AS ReviewTextCount,
+           COUNTIF(HasReviewTitle == true) AS ReviewTitleCount,
+           SUM(Rating) AS TotalRatingSum
+    FROM allRatingsNReviewsMonthFilter
+    GROUP BY Month;
+
+allRatingsNReviewsByMonth =
+    SELECT allRatingsNReviewsAllByMonth.Month AS Month,
+           allRatingsNReviewsAllByMonth.Total AS TotalRatingsCount,
+           allRatingsNReviewsAllByMonth.TotalRatingSum AS TotalRatings,
+           allRatingsNReviewsAllByMonth.FraudCount AS FraudRatingsCount,
+           allRatingsNReviewsAllByMonth.ReviewTextCount AS ReviewTextCount,
+           allRatingsNReviewsAllByMonth.ReviewTitleCount AS ReviewTitleCount,
+           allRatingsNReviewsFraudByMonth.Total AS FraudCount,
+           allRatingsNReviewsFraudByMonth.TotalRatingSum AS TotalFraudRatings,
+           allRatingsNReviewsFraudByMonth.ReviewTextCount AS FraudReviewTextCount,
+           allRatingsNReviewsFraudByMonth.ReviewTitleCount AS FraudReviewTitleCount,
+           allRatingsNReviewsNonFraudByMonth.Total AS NonFraudCount,
+           allRatingsNReviewsNonFraudByMonth.TotalRatingSum AS TotalNonFraudRatings,
+           allRatingsNReviewsNonFraudByMonth.ReviewTextCount AS NonFraudReviewTextCount,
+           allRatingsNReviewsNonFraudByMonth.ReviewTitleCount AS NonFraudReviewTitleCount
+    FROM allRatingsNReviewsAllByMonth
+    INNER JOIN
+        allRatingsNReviewsFraudByMonth
+        ON allRatingsNReviewsFraudByMonth.Month == allRatingsNReviewsAllByMonth.Month
+         INNER JOIN allRatingsNReviewsNonFraudByMonth ON allRatingsNReviewsNonFraudByMonth.Month == allRatingsNReviewsAllByMonth.Month;
+
+allRatingsNReviewsFraudByProduct =
+   SELECT ProductId,
+          ProductName,
+           COUNT(*) AS Total,
+           COUNTIF(HasReviewText == true) AS ReviewTextCount,
+           COUNTIF(HasReviewTitle == true) AS ReviewTitleCount,
+           SUM(Rating) AS TotalRatingSum
+    FROM allRatingsNReviewsFraud
+    GROUP BY ProductId, ProductName;
+
+allRatingsNReviewsNonFraudByProduct =
+   SELECT ProductId,
+          ProductName,
+           COUNT(*) AS Total,
+           COUNTIF(HasReviewText == true) AS ReviewTextCount,
+           COUNTIF(HasReviewTitle == true) AS ReviewTitleCount,
+           SUM(Rating) AS TotalRatingSum
+    FROM allRatingsNReviewsNonFraud
+    GROUP BY ProductId, ProductName;
+
+allRatingsNReviewsAllByProduct =
+   SELECT ProductId,
+          ProductName,
+           COUNT(*) AS Total,
+           COUNTIF(IsFraudulent == true) AS FraudCount,
+           COUNTIF(HasReviewText == true) AS ReviewTextCount,
+           COUNTIF(HasReviewTitle == true) AS ReviewTitleCount,
+           SUM(Rating) AS TotalRatingSum
+    FROM allRatingsNReviewsMonthFilter
+    GROUP BY ProductId, ProductName;
+
+
+allRatingsNReviewsByProduct =
+    SELECT allRatingsNReviewsAllByProduct.ProductId AS ProductId,
+           allRatingsNReviewsAllByProduct.ProductName AS ProductName,
+           allRatingsNReviewsAllByProduct.Total AS TotalRatingsCount,
+           allRatingsNReviewsAllByProduct.TotalRatingSum AS TotalRatings,
+           allRatingsNReviewsAllByProduct.FraudCount AS FraudRatingsCount,
+           allRatingsNReviewsAllByProduct.ReviewTextCount AS ReviewTextCount,
+           allRatingsNReviewsAllByProduct.ReviewTitleCount AS ReviewTitleCount,
+           allRatingsNReviewsFraudByProduct.Total AS FraudCount,
+           allRatingsNReviewsFraudByProduct.TotalRatingSum AS TotalFraudRatings,
+           allRatingsNReviewsFraudByProduct.ReviewTextCount AS FraudReviewTextCount,
+           allRatingsNReviewsFraudByProduct.ReviewTitleCount AS FraudReviewTitleCount,
+           allRatingsNReviewsNonFraudByProduct.Total AS NonFraudCount,
+           allRatingsNReviewsNonFraudByProduct.TotalRatingSum AS TotalNonFraudRatings,
+           allRatingsNReviewsNonFraudByProduct.ReviewTextCount AS NonFraudReviewTextCount,
+           allRatingsNReviewsNonFraudByProduct.ReviewTitleCount AS NonFraudReviewTitleCount
+    FROM allRatingsNReviewsAllByProduct
+    INNER JOIN
+        allRatingsNReviewsFraudByProduct
+        ON allRatingsNReviewsFraudByProduct.ProductId == allRatingsNReviewsAllByProduct.ProductId
+         INNER JOIN allRatingsNReviewsNonFraudByProduct ON allRatingsNReviewsNonFraudByProduct.ProductId == allRatingsNReviewsAllByProduct.ProductId;
+
+productInstalls =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputProductInstallStream
+    );
+
+installsByProduct =
+    SELECT ProductId,
+           SUM(InstallsCount) AS InstallCount
+    FROM productInstalls
+    GROUP BY ProductId;
+
+allRatingsNReviewsInstallsByProduct =
+    SELECT allRatingsNReviewsByProduct.*,
+           installsByProduct.InstallCount AS InstallCount
+    FROM allRatingsNReviewsByProduct
+         LEFT JOIN installsByProduct
+         ON installsByProduct.ProductId == allRatingsNReviewsByProduct.ProductId;
+
+productEngagement =
+    SELECT *
+    FROM (SSTREAM @inputProductEngagementStream);
+
+engagementByProduct =
+    SELECT ProductId,
+           MAX(AggregateScore) AS EngagementScore
+    FROM productEngagement
+    GROUP BY ProductId;
+
+
+allRatingsNReviewsInstallsEngagementByProduct =
+    SELECT allRatingsNReviewsInstallsByProduct.*,
+           engagementByProduct.EngagementScore AS EngagementScore
+    FROM allRatingsNReviewsInstallsByProduct
+         LEFT JOIN engagementByProduct
+         ON engagementByProduct.ProductId == allRatingsNReviewsInstallsByProduct.ProductId;
+
+productMSIXVCInstalls =
+    SELECT *
+    FROM (SSTREAM @inputMSIVCInstallStream);
+
+MSIXVCInstallsMonth =
+    SELECT ProductId,
+           EventReceivedDate.ToString("yyyyMM") AS Month
+    FROM productMSIXVCInstalls;
+
+MSIXVCInstallsMonthFilter =
+    SELECT *
+    FROM MSIXVCInstallsMonth
+    WHERE Month IN ("202203", "202204", "202205", "202206", "202207", "202208");
+
+MSIXVCInstallsByProduct =
+    SELECT ProductId,
+           COUNT(*) AS InstallCount
+    FROM MSIXVCInstallsMonthFilter
+    GROUP BY ProductId;
+
+allRatingsNReviewsAllInstallsEngagementByProduct =
+    SELECT allRatingsNReviewsInstallsEngagementByProduct.*,
+           MSIXVCInstallsByProduct.InstallCount AS MSIXVCInstallCount
+    FROM allRatingsNReviewsInstallsEngagementByProduct
+    LEFT JOIN
+        MSIXVCInstallsByProduct
+        ON MSIXVCInstallsByProduct.ProductId == allRatingsNReviewsInstallsEngagementByProduct.ProductId;
+
+
+//OUTPUT allRatingsNReviewsByMonth
+//TO @outputByMonth
+//WITH STREAMEXPIRY "30"
+//USING DefaultTextOutputter(delimiter: ',', outputHeader: true);
+
+OUTPUT MSIXVCInstallsMonth
+TO @outputByProduct
+WITH STREAMEXPIRY "30"
+USING DefaultTextOutputter(delimiter: ',', outputHeader: true);

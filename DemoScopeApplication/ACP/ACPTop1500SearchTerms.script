@@ -1,0 +1,111 @@
+﻿//Script GUID:a77017ca-c93a-4451-b998-73e2445703ac
+//Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 6), DateTime.Parse("@@endDate@@"));
+
+#DECLARE numberOfDays int = 31;
+#DECLARE startDate DateTime = @endDate.AddDays(1 - @numberOfDays);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+
+
+// This view will be used to get searches for the Month
+searchView =
+    VIEW "/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_Searches.view"
+    PARAMS
+    (
+        startDate = @startDateString,
+        endDate = @endDateString
+    );
+
+// Lower casing fields used for joins
+searches =
+    SELECT @endDate.ToString("yyyyMM") AS YearMonth,
+           SearchTerm.ToLower().Trim() AS SearchTerm,
+           DeviceIdFull.ToLower() AS DeviceIdFull
+    FROM searchView
+    WHERE !string.IsNullOrEmpty(DeviceIdFull)
+          AND !string.IsNullOrEmpty(SearchTerm)
+          AND IsTest!= 1  
+          AND IsFinalSearch 
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop";
+
+// Search Count for current month
+SearchesAgg = 
+    SELECT YearMonth,
+           SearchTerm,
+           COUNT(DISTINCT DeviceIdFull) AS SearchCount
+    FROM searches;
+
+// Ranking the searchterms by searcount
+SearchesRanked = 
+    SELECT YearMonth,
+           SearchTerm,
+           SearchCount,
+           RANK() OVER(ORDER BY SearchCount DESC) AS RankBySearchCount
+    FROM SearchesAgg;
+
+// Getting the top 1000 Records for current month
+TopSearches_CurrentMonth = 
+    SELECT YearMonth,
+           SearchTerm,
+           SearchCount
+    FROM SearchesRanked
+    WHERE RankBySearchCount <= 1500;
+
+// This view will be used to get searches for the Month
+searchProducts =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate = @startDateString,
+        endDate = @endDateString
+    )
+;
+
+searchProducts = SELECT * FROM searchProducts 
+          WHERE !string.IsNullOrEmpty(DeviceIdFull)
+          AND !string.IsNullOrEmpty(SearchTerm)
+          AND IsTest!= 1  
+          AND IsFinalSearch 
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND IsClicked == true
+;
+
+searches =
+    SELECT DateId,
+           SearchTerm.ToLower().Trim() AS SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           DeviceIdFull.ToLower() AS DeviceIdFull,
+           SlotNumber,
+           AttemptedInstalls,
+           ResultingSuccessfulAcquisitions_Free,
+           ResultingSuccessfulAcquisitions_Paid
+    FROM searchProducts
+    ;
+
+TopSearches =
+    SELECT a.*, b.SearchCount
+    FROM searches AS a
+         INNER JOIN
+             TopSearches_CurrentMonth AS b
+         ON a.SearchTerm == b.SearchTerm;
+
+SearchesAgg = 
+    SELECT SearchTerm,
+           SearchCount,
+           COUNT(DISTINCT DeviceIdFull) AS SearchCountFromSearchProduct,
+           AVG (SlotNumber) AS ACP,
+           (SUM(AttemptedInstalls) + SUM (ResultingSuccessfulAcquisitions_Free) + SUM (ResultingSuccessfulAcquisitions_Paid)) AS Installs
+    FROM TopSearches
+    ;
+
+OUTPUT SearchesAgg TO SSTREAM @"/users/vijeetthomas/ACPForTop1500SearchTerms.ss"
+CLUSTERED BY SearchTerm 
+        SORTED BY SearchCount DESC, ACP DESC;
+
+OUTPUT SearchesAgg TO @"/users/vijeetthomas/ACPForTop1500SearchTerms.csv" USING Outputters.Csv(outputHeader : true);
+
+

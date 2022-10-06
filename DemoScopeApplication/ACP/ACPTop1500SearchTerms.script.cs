@@ -1,4 +1,4 @@
-using Microsoft.SCOPE.Types;
+﻿using Microsoft.SCOPE.Types;
 using System;
 using System.Collections.Generic;
 using System.IO;

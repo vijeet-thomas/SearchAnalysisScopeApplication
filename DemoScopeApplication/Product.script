@@ -1,0 +1,93 @@
+﻿//Script GUID:c494b1d1-2634-4d31-8a6b-ae5b6213e0f0
+//Used for tracking history
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Common/Microsoft.Telemetry.Common.Utilities.dll";
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Census/Microsoft.Telemetry.Device.Census.dll";
+
+USING Microsoft.Telemetry.Device.Census;
+USING Microsoft.Telemetry.Common.Utilities;
+
+[PIN]REFERENCE @"shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.OSG.OneStore.DnA.Cosmos.DynamicViewResolver.dll";
+[PIN]REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/SchemaAdjuster/Microsoft.Telemetry.Common.SchemaAdjuster.dll";
+
+MODULE "/shares/asimov.prod.data/Public/Resources/Latest/Dimensions/CommonDimensions.module" AS CommonDimensions;
+
+#DECLARE PrivacyAnnotationPath string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/NGP/Resources/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+#DECLARE inputRnRStream string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/nikg/FraudDetection/RatingsAndReviews.ss";
+#DECLARE inputProductStream string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+
+#DECLARE outputStream string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/nikg/FraudDetection/Games/ProductDetailsFraudSummary.ss";
+
+products =
+    SELECT ProductId
+    FROM
+    (
+        SSTREAM @inputProductStream
+    )
+    WHERE ProductKind == "game";
+
+productDetails =
+    SELECT ProductId,
+           COUNT(*) AS TotalRatings,
+           COUNTIF(Rating == 5) AS FiveRatings,
+           COUNTIF(Rating == 4) AS FourRatings,
+           COUNTIF(Rating == 3) AS ThreeRatings,
+           COUNTIF(Rating == 2) AS TwoRatings,
+           COUNTIF(Rating == 1) AS OneRatings,
+           COUNTIF(IsFraudulent == true) AS Fraud,
+           COUNTIF(IsAppInstalled == true) AS AppInstalled,
+           COUNTIF(HasEntitlement == true) AS HasEntitlement,
+           COUNTIF(IsVerifiedUser == true) AS VerifiedUser,
+           COUNTIF(ProductTrial == true) AS TrialProduct,
+           COUNTIF(Helper.EndsWith(DeviceFamily, "Xbox")) AS XboxFamily,
+           COUNTIF(Helper.EndsWith(DeviceFamily, "Mobile")) AS MobileFamily,
+           COUNTIF(Helper.EndsWith(DeviceFamily, "Desktop")) AS DesktopFamily,
+           COUNTIF(Helper.IsNullOrEmpty(UnmoderatedReviewText)) AS UnModeratedReviewText,
+           COUNTIF(Helper.IsNullOrEmpty(ModeratedReviewText)) AS ModeratedReviewText,
+           COUNTIF(Helper.IsNullOrEmpty(UnmoderatedReviewTitle)) AS UnModeratedReviewTitle,
+           COUNTIF(Helper.IsNullOrEmpty(ModeratedReviewTitle)) AS ModeratedReviewTitle,
+           COUNTIF(!Helper.EndsWith(DeviceFamily, "Xbox") && !Helper.EndsWith(DeviceFamily, "Mobile") && !Helper.EndsWith(DeviceFamily, "Desktop")) AS OtherFamily
+    FROM
+    (
+        SSTREAM @inputRnRStream
+    )
+    WHERE Helper.IsValidProductId(ProductId) == true
+    GROUP BY ProductId;
+
+productDetailsPercent =
+    SELECT ProductId,
+           TotalRatings,
+           (Fraud/TotalRatings) * 100 AS FraudPercentage,
+           (AppInstalled/TotalRatings) * 100 AS AppInstallPercentage,
+           (HasEntitlement/TotalRatings) * 100 AS HasEntitlementPercentage,
+           (DesktopFamily/TotalRatings) * 100 AS DesktopPercentage
+    FROM productDetails
+         INNER JOIN products ON productDetails.ProductId == products.ProductId;
+
+productDetailsFraudPercent50 =
+    SELECT ProductId,
+           TotalRatings,
+           FraudPercentage,
+           AppInstallPercentage,
+           HasEntitlementPercentage,
+           DesktopPercentage
+    FROM productDetailsPercent
+    WHERE FraudPercentage > 50;
+
+
+productDetailsFraudSummary =
+    SELECT COUNT(ProductId) AS TotalProducts,
+           COUNTIF(FraudPercentage < 10) AS FraudBelow10,
+           COUNTIF(FraudPercentage >= 10 && FraudPercentage < 20) AS FraudBelow20,
+           COUNTIF(FraudPercentage >= 20 && FraudPercentage < 50) AS FraudBelow50,
+           COUNTIF(FraudPercentage > 50) AS FraudAbove50,
+           COUNTIF(FraudPercentage > 50 && TotalRatings < 100) AS FraudAbove50Ratings100,
+           COUNTIF(FraudPercentage > 50 && TotalRatings >= 100 && TotalRatings < 1000) AS FraudAbove50Ratings100_1000,
+           COUNTIF(FraudPercentage > 50 && TotalRatings >= 1000 && TotalRatings < 10000) AS FraudAbove50Ratings1000_10000
+    FROM productDetailsPercent; 
+
+
+OUTPUT productDetailsFraudSummary
+TO SSTREAM @outputStream
+WITH STREAMEXPIRY "30";

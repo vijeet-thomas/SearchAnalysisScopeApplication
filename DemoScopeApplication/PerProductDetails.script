@@ -1,0 +1,76 @@
+﻿//Script GUID:529c1d6f-79a8-447f-93ef-7dfc2eeac361
+//Used for tracking history
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Common/Microsoft.Telemetry.Common.Utilities.dll";
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Census/Microsoft.Telemetry.Device.Census.dll";
+
+USING Microsoft.Telemetry.Device.Census;
+USING Microsoft.Telemetry.Common.Utilities;
+
+[PIN]REFERENCE @"shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.OSG.OneStore.DnA.Cosmos.DynamicViewResolver.dll";
+[PIN]REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/SchemaAdjuster/Microsoft.Telemetry.Common.SchemaAdjuster.dll";
+
+MODULE "/shares/asimov.prod.data/Public/Resources/Latest/Dimensions/CommonDimensions.module" AS CommonDimensions;
+
+#DECLARE PrivacyAnnotationPath string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/NGP/Resources/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+#DECLARE inputRnRStream string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/nikg/FraudDetection/RatingsAndReviews.ss";
+
+#DECLARE outputStream string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/nikg/FraudDetection/ProductDetail.ss";
+
+productDetails =
+    SELECT ProductId,
+           COUNT(*) AS TotalRatings,
+           COUNTIF(Rating == 5) AS FiveRatings,
+           COUNTIF(Rating == 4) AS FourRatings,
+           COUNTIF(Rating == 3) AS ThreeRatings,
+           COUNTIF(Rating == 2) AS TwoRatings,
+           COUNTIF(Rating == 1) AS OneRatings,
+           COUNTIF(IsFraudulent == true) AS Fraud,
+           COUNTIF(IsAppInstalled == true) AS AppInstalled,
+           COUNTIF(IsVerifiedUser == true) AS VerifiedUser,
+           COUNTIF(ProductTrial == true) AS TrialProduct,
+           COUNTIF(Helper1.EndsWith(DeviceFamily, "Xbox")) AS XboxFamily,
+           COUNTIF(Helper1.EndsWith(DeviceFamily, "Mobile")) AS MobileFamily,
+           COUNTIF(Helper1.EndsWith(DeviceFamily, "Desktop")) AS DesktopFamily,
+           COUNTIF(!Helper1.EndsWith(DeviceFamily, "Xbox") && !Helper1.EndsWith(DeviceFamily, "Mobile") && !Helper1.EndsWith(DeviceFamily, "Desktop")) AS OtherFamily
+    FROM
+    (
+        SSTREAM @inputRnRStream
+    )
+    WHERE ProductId IN ("9NMZLZ57R3T7",
+"XPFNZKWN35KD6Z",
+"XPDM28CQSPXTWQ",
+"9N9KBWP6HVQQ",
+"XPDNXDPXBRSVXT",
+"9NR66993PKM0",
+"9P81H1KGFKC7",
+"9NPQCDPGJ6SZ",
+"9PM8DW3458ZV",
+"9NBHCS1LX4R0",
+"9MZ5RG8R2B89",
+"9PCMZ6BXK8GH",
+"XP9B0HMWQQPK3W",
+"9P8PRDD1ZM6L",
+"9NBLGGH2J19W",
+"9PB2MZ1ZMB1S",
+"9WZDNCRFJ3TJ",
+"9NKSQGP7F2NH",
+"9P7BP5VNWKX5",
+"9WZDNCRFJ3PV",
+"9WZDNCRFHWLH",
+"9P1J8S7CCWWT",
+"9MV0B5HZVK9Z",
+"9PKTQ5699M62",
+"9WZDNCRFJ3L1",
+"9NCBCSZSJRSB",
+"9P6RC76MSMMJ",
+"XPDP273C0XHQH2",
+"9NH2GPH4JZS4",
+"9NXQXXLFST89")
+    GROUP BY ProductId;
+
+
+OUTPUT productDetails
+TO SSTREAM @outputStream
+WITH STREAMEXPIRY "30";

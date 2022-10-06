@@ -8,6 +8,7 @@
 #DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
 #DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
 
+
 // This view will be used to get searches for the Month
 searchProducts =
     VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
@@ -35,6 +36,7 @@ searches =
            ProductDisplayName,
            DeviceIdFull.ToLower() AS DeviceIdFull,
            SlotNumber,
+           AttemptedInstalls,
            ResultingSuccessfulAcquisitions_Free,
            ResultingSuccessfulAcquisitions_Paid
     FROM searchProducts
@@ -48,7 +50,7 @@ SearchesProdAgg =
            ProductDisplayName,
            COUNT(DISTINCT DeviceIdFull) AS SearchCount,
            AVG (SlotNumber) AS ACP,
-           (SUM (ResultingSuccessfulAcquisitions_Free) + SUM (ResultingSuccessfulAcquisitions_Paid)) AS Installs
+           (SUM(AttemptedInstalls) + SUM (ResultingSuccessfulAcquisitions_Free) + SUM (ResultingSuccessfulAcquisitions_Paid)) AS Installs
     FROM searches
     ;
 
@@ -57,7 +59,7 @@ SearchesAgg =
            SearchTerm,
            COUNT(DISTINCT DeviceIdFull) AS SearchCount,
            AVG (SlotNumber) AS ACP,
-           (SUM (ResultingSuccessfulAcquisitions_Free) + SUM (ResultingSuccessfulAcquisitions_Paid)) AS Installs
+           (SUM(AttemptedInstalls) + SUM (ResultingSuccessfulAcquisitions_Free) + SUM (ResultingSuccessfulAcquisitions_Paid)) AS Installs
     FROM searches
     ;
 

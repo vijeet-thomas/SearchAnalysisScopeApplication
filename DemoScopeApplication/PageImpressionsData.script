@@ -82,38 +82,75 @@ FROM PageImpressionsData
 WHERE !string.IsNullOrWhiteSpace(Content) AND Content != "[]"
     AND !string.IsNullOrWhiteSpace(Actions) AND Actions != "[]";
 
-OUTPUT pageData TO SSTREAM "/users/vijeetthomas/PageImpressions/PageData.ss";
+pageExtractedData = 
+    SELECT SearchUtils.GetSearchResults(SearchResultData, SearchTerm, Market, SearchActionsData) AS SearchResults
+    FROM pageData;
+
+OUTPUT pageExtractedData TO SSTREAM "/users/vijeetthomas/PageImpressions/PageExtractedData.ss";
 
 //ContentType = 4 --> Search Results
 #CS
-    
-public static class RatingUtils 
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
+using System;
+
+public static class SearchUtils 
 {
-    public static string GetRatingPerMarket(List<SearchResultsJson> searchResults, string ProductId, string Catalog, string PartnerProductId) {
+    public static string GetSearchResults(List<SearchResultsJson> searchResults, string searchTerm, string Market, List<SearchActionsJson> searchActions) {
+        List<SearchOutput> result = new List<SearchOutput>();
+        foreach (var searchResult in searchResults) {
+            if (searchResult != null) {
+                SearchOutput searchObj = new SearchOutput();
+                searchObj.searchTerm = searchTerm;
+                searchObj.Market = Market;
+                searchObj.contentType = searchResult.contentType;
+                searchObj.slotNumber = searchResult.slotNumber;
+                searchObj.contentName = searchResult.contentName;
+                searchObj.contentSource = searchResult.contentSource;
+                searchObj.areaName = searchResult.areaName;
+                searchObj.product = searchResult.product;
+                if (searchResult.contentType == 4l) {
+                    result.Add(searchObj);
+                }
+            }
+        }
+        foreach (var searchAction in searchActions) {
+            if (searchAction != null && searchAction.behavior != null && searchAction.slotNumber != null) {
+                if (searchAction.behavior == -17l || searchAction.behavior == -6l) {
+                    result[searchAction.slotNumber].IntentToInstall = 1l;
+                }
+                else if (searchAction.behavior == -33l) {
+                    result[searchAction.slotNumber].IsClicked = 1l;
+                }
+            }
+        }
         return string.Join(",", result);
     }
+
 }
 
 public class SearchResultsJson {
 
     // "contentType": "4", "slotNumber": "7", "contentName": "Up A Notch", "contentSource": "Organic", "areaName": "SearchVerticalTileList", "product": "msa:9NNS08N6T354", "impressions": "1", "seq": "63" },
     [JsonProperty("contentType")]
-    int contentType;
+    public int contentType;
     
     [JsonProperty("slotNumber")]
-    int slotNumber;
+    public int slotNumber;
 
     [JsonProperty("contentName")]
-    string contentName;
+    public string contentName;
     
     [JsonProperty("contentSource")]
-    string contentSource;
+    public string contentSource;
     
     [JsonProperty("areaName")]
-    string areaName;
+    public string areaName;
     
     [JsonProperty("product")]
-    string product;
+    public string product;
     
 } 
 
@@ -121,24 +158,75 @@ public class SearchActionsJson {
     // { "contentType": "0", "slotNumber": "0", "contentName": "Installeren", "contentId": "installButton", "contentSource": "HCR", "areaName": "pdpButtonPanel", "product": "XP8BT8DW290MPQ", "actions": "2", "behavior": "-17", "seq": "34;63" }
     //behaviour = -17 --> install, behaviour = -6 --> purchase
     [JsonProperty("contentType")]
-    int contentType;
+    public int contentType;
     
     [JsonProperty("slotNumber")]
-    int slotNumber;
+    public int slotNumber;
 
     [JsonProperty("contentName")]
-    string contentName;
+    public string contentName;
     
     [JsonProperty("contentSource")]
-    string contentSource;
+    public string contentSource;
     
     [JsonProperty("areaName")]
-    string areaName;
+    public string areaName;
     
     [JsonProperty("product")]
-    string product;
+    public string product;
 
     [JsonProperty("behavior")]
-    int behavior;
+    public int behavior;
 }
+
+public class SearchOutput {
+
+    public SearchOutput(){
+        slotNumber = 0;
+        contentType = 0;
+        IsClicked = 0;
+        IntentToInstall = 0;
+    }
+    
+    [JsonProperty("searchTerm")]
+    public string searchTerm;
+
+    [JsonProperty("Market")]
+    public string Market;
+
+    [JsonProperty("contentType")]
+    public int contentType;
+    
+    [JsonProperty("slotNumber")]
+    public int slotNumber;
+
+    [JsonProperty("contentName")]
+    public string contentName;
+    
+    [JsonProperty("contentSource")]
+    public string contentSource;
+    
+    [JsonProperty("areaName")]
+    public string areaName;
+    
+    [JsonProperty("product")]
+    public string product;
+
+    [JsonProperty("IsClicked")]
+    public int IsClicked;
+
+    [JsonProperty("IntentToInstall")]
+    public int IntentToInstall;
+
+    public override string ToString()  
+    {  
+        string output = "{\"searchTerm\":\""+searchTerm+"\", \"Market\":\""+Market
+                        +"\", \"contentType\":"+contentType+", \"slotNumber\":"+slotNumber
+                        +", \"contentName\":\""+contentName+"\", \"contentSource\":\""+contentSource+"\", \"areaName\":\""+areaName+"\", \"product\":\""+product+
+                       // +"\", \"IsClicked\":"+IsClicked+", \"IntentToInstall\":"+IntentToInstall
+                        + "}";
+        return output;
+    } 
+}
+
 #ENDCS
