@@ -1,0 +1,74 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:6da0aa21-4f40-4389-90bc-ef0156b0d08c
+// Used for tracking history
+//Script GUID:79fc422f-819e-4f92-b697-9ede6ca8e846
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+#DECLARE rootFolder string = @"/users/vijeetthomas/";
+#DECLARE outputBusinessDaily string  = string.Format("{0}/Searches/TotalSearchesPerMarket_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+
+searchProductsDaily =
+    VIEW @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        startDate = @startDate1DayString,
+        endDate = @endDateString
+    )
+;
+
+//#DECLARE inputSource string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/2023/01/ExperimentationSearchProduct_2023_01_27.ss";
+//
+//inputData =
+//    SELECT *
+//    FROM
+//    (
+//        SSTREAM @inputSource
+//    );
+
+BaseDataDaily =
+    SELECT DateId AS Timestamp,
+           PageImpressionGuid,
+           Country AS Market,
+           ContentSource
+    FROM inputData
+    WHERE (SearchType == "Regular" OR SearchType == "Autosuggest")
+    AND IsFinalSearch == true
+    //AND DeviceClass == "Windows.Desktop"
+    //AND SearchTerm.Length > 0
+    //AND SlotNumber >= 0;
+    ;
+
+SearchesDaily =
+    SELECT Timestamp, 
+           Market,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseDataDaily;
+
+ZeroSearchesDaily =
+    SELECT Timestamp, 
+           Market,
+           COUNT(DISTINCT PageImpressionGuid) AS ZeroSearches
+    FROM BaseDataDaily
+    WHERE ContentSource == "ZeroResult";
+
+SearchesAgg =
+    SELECT a.*,
+           b.ZeroSearches
+    FROM SearchesDaily AS a
+    INNER JOIN
+        ZeroSearchesDaily AS b
+        ON a.Timestamp == b.Timestamp AND a.Market == b.Market;
+
+Summary =
+    SELECT Market,
+           SUM(TotalSearches) AS TotalSearches,
+           SUM(ZeroSearches) AS ZeroSearches,
+           SUM(ZeroSearches) / SUM(TotalSearches) AS ZeroPercentage
+    FROM SearchesAgg;
+
+OUTPUT Summary
+TO SSTREAM @outputBusinessDaily;

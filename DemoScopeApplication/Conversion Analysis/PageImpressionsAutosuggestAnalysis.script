@@ -1,0 +1,64 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:ed43f23e-f7fc-4b92-9d6d-a5e186275eea
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -10), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate;
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/SearchTermAnalysis/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/SFA_PageImpressions_AutoSuggestAnalysis2.ss", @outputRoot);
+#DECLARE streamExpiryString string = "60";
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+
+inputData =
+    VIEW @SFAView 
+    PARAMS 
+    (
+        startDate = @startDate1DayString,
+        endDate = @endDateString
+    );
+
+AllSearches =
+    SELECT *
+    FROM inputData;
+    WHERE MajorBuildNumber == 22305;
+
+Searches = SELECT DateId,
+           COUNT (DISTINCT ImpressionGuid) AS SearchImpressions,
+           COUNT (DISTINCT CVRoot) AS SearchSessions
+    FROM AllSearches
+    WHERE Nav_AreaName == "AutoSuggest" OR (PageName == "pdp" AND Ref_AreaName == "AutoSuggest");
+
+Clicks = SELECT DateId,
+           COUNT (DISTINCT ImpressionGuid) AS ClicksImpressions,
+           COUNT (DISTINCT CVRoot) AS ClicksSessions
+    FROM AllSearches
+    WHERE PageName == "pdp" AND Ref_AreaName == "AutoSuggest";
+
+Installs = SELECT DateId,
+           COUNT (DISTINCT ImpressionGuid) AS InstallsImpressions,
+           COUNT (DISTINCT CVRoot) AS InstallSessions
+    FROM AllSearches
+    WHERE PageName == "pdp" AND Ref_AreaName == "AutoSuggest"
+        AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0) ;
+
+SearchSummary = 
+    SELECT a.*,
+           b.*.Except(DateId),
+           c.*.Except(DateId),
+           (ClicksImpressions*100.0/SearchImpressions) AS CTRImpressions,
+           (InstallsImpressions*100.0/SearchImpressions) AS ConversionImpressions,
+           (ClicksSessions*100.0/SearchSessions) AS CTRSessions,
+           (InstallSessions*100.0/SearchSessions) AS ConversionSessions
+    FROM Searches AS a 
+         INNER JOIN Clicks AS b 
+            ON a.DateId == b.DateId
+         INNER JOIN Installs AS c
+            ON a.DateId == c.DateId
+;
+
+OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch
+CLUSTERED BY DateId
+SORTED BY DateId DESC;

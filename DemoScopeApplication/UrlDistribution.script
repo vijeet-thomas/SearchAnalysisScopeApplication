@@ -1,0 +1,205 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:b4a0b2eb-080f-48d6-9230-a6d12378871b
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE firstDayMarch DateTime = new DateTime(2023, 3, 14);
+#DECLARE firstDayApril DateTime = new DateTime(2023, 4, 1);
+#DECLARE lastDayMarch DateTime = new DateTime(2023, 3, 31);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE firstDayMarchString string = @firstDayMarch.ToString("yyyy-MM-dd");
+#DECLARE firstDayAprilString string = @firstDayApril.ToString("yyyy-MM-dd");
+#DECLARE lastDayMarchString string = @lastDayMarch.ToString("yyyy-MM-dd");
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE outputStream string = string.Format("{0}/UrlDIstribution.ss", @rootFolder);
+#DECLARE streamExpiryString string = "60";
+
+//#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_PageImpressions/UniversalStore_PageImpressions.view";
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+//#DECLARE UniversalView string = @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view";
+#DECLARE ExperimentationView string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view";
+
+inputData =
+    VIEW @ExperimentationView 
+    PARAMS 
+    (
+        //startDate = @startDate1DayString,
+        //endDate = @endDateString
+        StartDate = @firstDayMarchString,
+        EndDate = @lastDayMarchString
+    );
+
+Flight1 =
+    SELECT CVRoot, DeviceIdFull 
+    FROM inputData
+    WHERE (FlightName.Contains("enablePremiumSearch:true")
+          OR FlightName.Contains("enablePremiumSearch:true"))
+;
+
+Sessions1 =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSessions
+    FROM Flight1;
+
+Users1 =
+    SELECT COUNT(DISTINCT DeviceIdFull ) AS TotalUsers
+    FROM Flight1
+          ;
+
+SearchSummary = 
+    SELECT "March" AS Month,
+           "enablePremiumSearch:true" AS Flight,
+        a.*, b.*
+    FROM Sessions1 AS a
+                  CROSS JOIN Users1 AS b
+;
+
+Flight2 =
+    SELECT CVRoot, DeviceIdFull 
+    FROM inputData
+    WHERE (FlightName.Contains("enablePremiumSearch:false")
+          OR FlightName.Contains("enablePremiumSearch:false"))
+;
+
+Sessions2 =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSessions
+    FROM Flight2;
+
+User2 =
+    SELECT COUNT(DISTINCT DeviceIdFull ) AS TotalUsers
+    FROM Flight2
+          ;
+
+SearchSummary2 = 
+    SELECT "March" AS Month,
+           "enablePremiumSearch:false" AS Flight,
+        a.*, b.*
+    FROM Sessions2 AS a
+                  CROSS JOIN User2 AS b
+;
+
+Flight3 =
+    SELECT CVRoot, DeviceIdFull 
+    FROM inputData
+    WHERE (FlightName.Contains("enablePremiumSearch")
+          OR FlightName.Contains("enablePremiumSearch"))
+;
+
+Sessions3 =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSessions
+    FROM Flight3;
+
+User3 =
+    SELECT COUNT(DISTINCT DeviceIdFull ) AS TotalUsers
+    FROM Flight3
+          ;
+
+SearchSummary3 = 
+    SELECT "March" AS Month,
+           "enablePremiumSearch" AS Flight,
+        a.*, b.*
+    FROM Sessions3 AS a
+                  CROSS JOIN User3 AS b
+;
+
+SearchSummaryMarch =
+    SELECT *
+    FROM SearchSummary
+    UNION ALL
+    SELECT *
+    FROM SearchSummary2 UNION ALL SELECT * FROM SearchSummary3;
+
+inputData2 =
+    VIEW @ExperimentationView 
+    PARAMS 
+    (
+        //startDate = @startDate1DayString,
+        //endDate = @endDateString
+        StartDate = @firstDayAprilString,
+        EndDate = @endDateString
+    );
+
+FlightApril1 =
+    SELECT CVRoot, DeviceIdFull 
+    FROM inputData2
+    WHERE (FlightName.Contains("enablePremiumSearch:true")
+          OR FlightName.Contains("enablePremiumSearch:true"))
+;
+
+SessionsApril1 =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSessions
+    FROM FlightApril1;
+
+UsersApril1 =
+    SELECT COUNT(DISTINCT DeviceIdFull ) AS TotalUsers
+    FROM FlightApril1
+          ;
+
+SearchSummaryApril1 = 
+    SELECT "April" AS Month,
+           "enablePremiumSearch:true" AS Flight,
+        a.*, b.*
+    FROM SessionsApril1 AS a
+                  CROSS JOIN UsersApril1 AS b
+;
+
+FlightApril2 =
+    SELECT CVRoot, DeviceIdFull 
+    FROM inputData2
+    WHERE (FlightName.Contains("enablePremiumSearch:false")
+          OR FlightName.Contains("enablePremiumSearch:false"))
+;
+
+SessionsApril2 =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSessions
+    FROM FlightApril2;
+
+UsersApril2 =
+    SELECT COUNT(DISTINCT DeviceIdFull ) AS TotalUsers
+    FROM FlightApril2
+          ;
+
+SearchSummaryApril2 = 
+    SELECT "April" AS Month,
+           "enablePremiumSearch:false" AS Flight,
+        a.*, b.*
+    FROM SessionsApril2 AS a
+                  CROSS JOIN UsersApril2 AS b
+;
+
+FlightApril3 =
+    SELECT CVRoot, DeviceIdFull 
+    FROM inputData2
+    WHERE (FlightName.Contains("enablePremiumSearch")
+          OR FlightName.Contains("enablePremiumSearch"))
+;
+
+SessionsApril3 =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSessions
+    FROM FlightApril3;
+
+UsersApril3 =
+    SELECT COUNT(DISTINCT DeviceIdFull ) AS TotalUsers
+    FROM FlightApril3
+          ;
+
+SearchSummaryApril3 = 
+    SELECT "April" AS Month,
+           "enablePremiumSearch" AS Flight,
+        a.*, b.*
+    FROM SessionsApril3 AS a
+                  CROSS JOIN UsersApril3 AS b
+;
+
+SearchSummaryApril =
+    SELECT *
+    FROM SearchSummaryApril1
+    UNION ALL
+    SELECT *
+    FROM SearchSummaryApril2 UNION ALL SELECT * FROM SearchSummaryApril3;
+;
+
+SearchTotalSummary = SELECT * FROM SearchSummaryMarch UNION ALL SELECT * FROM SearchSummaryApril;
+
+OUTPUT SearchTotalSummary TO SSTREAM @outputStream;
+

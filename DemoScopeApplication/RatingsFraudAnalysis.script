@@ -1,0 +1,80 @@
+﻿//Script GUID:0d7bba0e-1ef0-456c-9cee-e278d5047f6e
+//Used for tracking history
+
+//Script GUID:6f1973b6-9f80-41da-8f2e-e0e0482412b9
+//Used for tracking history
+#DECLARE startDate DateTime = DateTime.Parse("2021-11-01");
+#DECLARE endDate DateTime = DateTime.Parse("2022-07-31");
+//RatingsStream = SSTREAM @"/shares/asimov.prod.data/PublicPartner/Processed/DSXRatings/prod/cooked/dataForPartners/V2/MasterReviews/MasterReviews.ss";
+RatingsStream2 = SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/DSXRatings/prod/cooked/dataForPartners/V2/RatingsSummaryWithDeviceFamily/All/RatingsSummaryWithDeviceFamily.ss";
+#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+
+filteredStream =
+    SELECT DISTINCT ProductId,ProductName
+    FROM
+    (
+        SSTREAM @inputStream
+    );
+
+RatingData =
+    SELECT r.*,f.ProductName
+    FROM RatingsStream2 AS r
+    INNER JOIN
+        filteredStream AS f
+        ON r.ProductId == f.ProductId;
+ 
+RatingsPerProduct =
+    SELECT ProductName,
+           ProductId,
+           SUM(FraudCount) AS FraudCount,
+           SUM(RatingCount) AS RatingCount,
+           SUM(FraudCount) + SUM(RatingCount) AS TotalCount
+    FROM RatingData
+    WHERE Market == "ALL"
+    AND DeviceFamily == "ALL"
+;
+
+RatingsPerProduct = 
+    SELECT *,
+           (FraudCount*100.0/TotalCount) AS FraudPercentage,
+           RatingCount*100.0/TotalCount AS GoodRatingPercentage
+    FROM RatingsPerProduct
+;
+
+RatingsPerProduct =
+    SELECT *
+    FROM RatingsPerProduct
+    WHERE FraudPercentage > 10;
+
+RatingSummary =
+    SELECT COUNTIF(TotalCount >= 1000 AND FraudPercentage >= 0 AND FraudPercentage < 10) AS Fraud0_10_Total1000,
+           COUNTIF(TotalCount >= 1000 AND FraudPercentage >= 10 AND FraudPercentage < 20) AS Fraud10_20_Total1000,
+           COUNTIF(TotalCount >= 1000 AND FraudPercentage >= 20 AND FraudPercentage < 30) AS Fraud20_30_Total1000,
+           COUNTIF(TotalCount >= 1000 AND FraudPercentage >= 30 AND FraudPercentage < 40) AS Fraud30_40_Total1000,
+           COUNTIF(TotalCount >= 1000 AND FraudPercentage >= 40 AND FraudPercentage < 50) AS Fraud40_50_Total1000,
+           COUNTIF(TotalCount >= 1000 AND FraudPercentage >= 50 AND FraudPercentage < 60) AS Fraud50_60_Total1000,
+           COUNTIF(TotalCount >= 1000 AND FraudPercentage >= 60 AND FraudPercentage < 70) AS Fraud60_70_Total1000,
+           COUNTIF(TotalCount >= 1000 AND FraudPercentage >= 70 AND FraudPercentage < 80) AS Fraud70_80_Total1000,
+           COUNTIF(TotalCount >= 1000 AND FraudPercentage >= 80 AND FraudPercentage < 90) AS Fraud80_90_Total1000,
+           COUNTIF(TotalCount >= 1000 AND FraudPercentage >= 90) AS Fraud90_Total1000,
+           COUNTIF(FraudPercentage >= 0 AND FraudPercentage < 10) AS Fraud0_10,
+           COUNTIF(FraudPercentage >= 10 AND FraudPercentage < 20) AS Fraud10_20,
+           COUNTIF(FraudPercentage >= 20 AND FraudPercentage < 30) AS Fraud20_30,
+           COUNTIF(FraudPercentage >= 30 AND FraudPercentage < 40) AS Fraud30_40,
+           COUNTIF(FraudPercentage >= 40 AND FraudPercentage < 50) AS Fraud40_50,
+           COUNTIF(FraudPercentage >= 50 AND FraudPercentage < 60) AS Fraud50_60,
+           COUNTIF(FraudPercentage >= 60 AND FraudPercentage < 70) AS Fraud60_70,
+           COUNTIF(FraudPercentage >= 70 AND FraudPercentage < 80) AS Fraud70_80,
+           COUNTIF(FraudPercentage >= 80 AND FraudPercentage < 90) AS Fraud80_90,
+           COUNTIF(FraudPercentage >= 90) AS Fraud90,
+           COUNTIF(RatingCount > 0) AS GoodRatingProducts,
+           COUNTIF(TotalCount > 0) AS TotalRatingProducts,
+           COUNTIF(TotalCount >= 1000) AS TotalRatingProductsOver1000
+    FROM RatingsPerProduct;
+
+OUTPUT RatingsPerProduct TO SSTREAM @"/users/vijeetthomas/FraudAnalysis/RatingPerProduct.ss"
+CLUSTERED BY ProductName,ProductId
+        SORTED BY FraudPercentage DESC;
+;
+OUTPUT RatingSummary TO SSTREAM @"/users/vijeetthomas/FraudAnalysis/RatingSummary.ss";
+

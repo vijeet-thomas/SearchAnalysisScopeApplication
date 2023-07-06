@@ -1,0 +1,126 @@
+﻿//Script GUID:c258df84-af68-46a2-8b3b-fe518fbfc209
+//Used for tracking history
+// Parameters
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+
+#DECLARE numberOfDays int = 30;
+#DECLARE startDate DateTime = @endDate.AddDays(1 - @numberOfDays);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+
+#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/KPIs/Searches/HealthMetrics/AvgClickPosition/Daily/2022/09/SearchProductFirstClickContentSourceMarket_2022_09_02.ss";
+#DECLARE input_Daily string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/KPIs/Searches/HealthMetrics/AvgClickPosition/Daily/");
+
+#DECLARE pattern_Daily string = string.Format("/%Y/%m/SearchProductFirstClickContentSourceMarket_%Y_%m_%d.ss");
+
+#DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+
+input =
+    (
+    SSTREAM SPARSE STREAMSET @input_Daily
+                   PATTERN @pattern_Daily
+                   RANGE __date = [@startDateString, @endDateString]
+    )
+;
+
+productNames =
+    SELECT *
+    FROM
+    (
+        SSTREAM @productNameMapper
+    );
+
+searchtermAnalysis =
+    SELECT DateId,
+           Market,
+           SearchTerm.Trim().ToLowerInvariant() AS SearchTerm, 
+           AVG(SlotNumber) AS ACP,
+           SUM(SlotNumber) AS SumSearchPositions,
+           COUNT(SearchTerm.Trim().ToLowerInvariant()) AS SearchCount
+    FROM input
+    WHERE SearchType == "Regular"
+    AND (AppVersion == "Store 21" OR "All" == "Store 21" OR ("Store 21" == "Store 21" AND AppVersion LIKE "2%") OR ("Legacy" == "Store 21" AND AppVersion LIKE "1%"))
+    AND (DeviceClass == "Windows.Desktop" OR "Windows.Desktop" == "All")
+    AND (Market == "US" OR "US" == "All")
+;
+
+//stream1 = SELECT * FROM acpData WHERE DateId IN (20220821, 20220901);
+//OUTPUT stream1 TO SSTREAM "/users/vijeetthomas/search/ACPAnalysis2/SearchTermsAllMarkets08210901.ss"
+//        CLUSTERED BY DateId, SearchTermCleaned
+//        SORTED BY SearchCount DESC;
+acpData2 =
+    SELECT DateId,
+           Market,
+           ProductId,
+           AVG(SlotNumber) AS ACP,
+           SUM(SlotNumber) AS SumSearchPositions,
+           COUNT(*) AS SearchCount
+    FROM input
+    WHERE SearchType == "Regular"
+    AND (AppVersion == "Store 21" OR "All" == "Store 21" OR ("Store 21" == "Store 21" AND AppVersion LIKE "2%") OR ("Legacy" == "Store 21" AND AppVersion LIKE "1%"))
+    AND (DeviceClass == "Windows.Desktop" OR "Windows.Desktop" == "All")
+    AND (Market == "US" OR "US" == "All")
+;
+
+acpData3 =
+    SELECT DateId,
+           Market,
+           SearchTerm.Trim().ToLowerInvariant() AS SearchTerm,
+           ProductId,
+           AVG(SlotNumber) AS ACP,
+           SUM(SlotNumber) AS SumSearchPositions,
+           COUNT(*) AS SearchCount
+    FROM input
+    WHERE SearchType == "Regular"
+    AND (AppVersion == "Store 21" OR "All" == "Store 21" OR ("Store 21" == "Store 21" AND AppVersion LIKE "2%") OR ("Legacy" == "Store 21" AND AppVersion LIKE "1%"))
+    AND (DeviceClass == "Windows.Desktop" OR "Windows.Desktop" == "All")
+    AND (Market == "US" OR "US" == "All")
+;
+
+productAnalysis =
+    SELECT DateId,
+           Market,
+           acpData2.ProductId,
+           productNames.ProductName,
+           ACP,
+           SumSearchPositions,
+           SearchCount
+    FROM acpData2 LEFT JOIN productNames ON acpData2.ProductId == productNames.ProductId ;
+
+searchTermToProductAnalysis = 
+    SELECT DateId,
+           Market,
+           SearchTerm,
+           acpData3.ProductId,
+           productNames.ProductName,
+           ACP,
+           SumSearchPositions,
+           SearchCount
+    FROM acpData3 LEFT JOIN productNames ON acpData3.ProductId == productNames.ProductId ;
+
+acp =
+    SELECT DateId,
+           SUM(SearchCount) AS TotalSearches,
+           SUM(SumSearchPositions) * 1.0 / SUM(SearchCount) AS ACPAcrossAllMarkets
+    FROM searchtermAnalysis;
+
+acp2 =
+    SELECT DateId,
+           Market,
+           SUM(SearchCount) AS TotalSearches,
+           SUM(SumSearchPositions) * 1.0 / SUM(SearchCount) AS ACPPerMarket
+    FROM searchtermAnalysis;
+    
+acpSummary = SELECT acp2.*,acp.ACPAcrossAllMarkets FROM acp2 INNER JOIN acp ON acp2.DateId == acp.DateId;
+
+//OUTPUT acpSummary TO SSTREAM "/users/vijeetthomas/search/ACPAnalysis2/ACPSummary.ss";
+OUTPUT productAnalysis TO SSTREAM "/users/vijeetthomas/search/ACPAnalysis2/ProductIdAnalysis.ss" 
+        CLUSTERED BY DateId, Market, ProductId, ProductName 
+        SORTED BY SearchCount DESC, ACP DESC;
+OUTPUT searchtermAnalysis TO SSTREAM "/users/vijeetthomas/search/ACPAnalysis2/SearchTermAnalysis.ss" 
+        CLUSTERED BY DateId, Market,SearchTerm 
+        SORTED BY SearchCount DESC, ACP DESC;
+OUTPUT searchTermToProductAnalysis TO SSTREAM "/users/vijeetthomas/search/ACPAnalysis2/SearchTermToProductAnalysis.ss" 
+        CLUSTERED BY DateId, Market,SearchTerm,ProductId,ProductName
+        SORTED BY SearchCount DESC, ACP DESC;
+//

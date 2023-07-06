@@ -1,0 +1,13 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:bc39eda5-5b0d-4d22-a2ea-d725a4a4c96f
+// Used for tracking history
+
+#DECLARE topSearchTerms string  = @"/users/vijeetthomas/ACPForTop1500SearchTerms.ss";
+
+SearchTerms =
+    SELECT SearchTerm
+    FROM
+    (
+        SSTREAM @topSearchTerms
+    );
+

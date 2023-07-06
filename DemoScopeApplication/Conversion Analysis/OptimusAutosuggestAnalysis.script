@@ -1,0 +1,73 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:745e5ef9-3916-4d56-9c79-1796a47e7675
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-10), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate DateTime = @endDate;
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/SearchTermAnalysis";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/OptimusSearchProduct_AutoSuggestAnalysis2.ss", @outputRoot);
+#DECLARE streamExpiryString string = "60";
+#DECLARE SearchProductView string = @"/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs/SearchProduct/SearchProduct.view";
+
+inputData =
+    VIEW @SearchProductView 
+    PARAMS 
+    (
+        StartDate = @startDateString,
+        EndDate = @endDateString
+    );
+
+BaseDataDaily =
+    SELECT *
+    FROM inputData
+    WHERE
+    SearchType == "AutoSuggest"
+    AND IsClicked > 0 AND !string.IsNullOrEmpty(ProductId)
+        AND AppVersion.Split('.')[0] == "22305";
+
+SearchesDaily =
+    SELECT //DateId,
+           Ref_CustomAttribute_3 AS SearchTerm,
+           COUNT(DISTINCT ImpressionGuid ) AS SearchImpressions,
+           COUNT(DISTINCT CVRoot ) AS SearchSessions
+    FROM BaseDataDaily;
+
+ClicksDaily = 
+    SELECT  //DateId,
+            Ref_CustomAttribute_3 AS SearchTerm,
+            COUNT(DISTINCT PDP_ImpressionGuid ) AS ClickImpressions,
+            COUNT(DISTINCT CVRoot ) AS ClickSessions
+    FROM BaseDataDaily
+    WHERE !string.IsNullOrEmpty(PDP_ImpressionGuid);
+
+InstallsDaily =
+    SELECT //DateId,
+            Ref_CustomAttribute_3 AS SearchTerm,
+           COUNT(DISTINCT PDP_ImpressionGuid ) AS InstallImpressions,
+           COUNT(DISTINCT CVRoot ) AS InstallSessions
+    FROM BaseDataDaily
+    WHERE !string.IsNullOrEmpty(PDP_ImpressionGuid)
+        AND IsAttemptedAcquisition > 0;
+
+SearchSummary = 
+    SELECT a.*,
+           b.ClickImpressions,
+           b.ClickSessions,
+           c.InstallImpressions,
+           c.InstallSessions
+    FROM SearchesDaily AS a INNER JOIN ClicksDaily AS b ON a.SearchTerm == b.SearchTerm INNER JOIN InstallsDaily AS c ON a.SearchTerm == c.SearchTerm;
+
+SearchSummary =
+    SELECT *,
+           (ClickImpressions * 100.0 / SearchImpressions) AS CTRImpressions,
+           (InstallImpressions * 100.0 / SearchImpressions) AS ConversionImpressions,
+           (ClickSessions * 100.0 / SearchSessions) AS CTRSessions,
+           (InstallSessions * 100.0 / SearchSessions) AS ConversionSessions
+    FROM SearchSummary;
+
+OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch
+CLUSTERED BY SearchTerm
+SORTED BY DateId DESC;

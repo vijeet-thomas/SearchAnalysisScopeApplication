@@ -1,0 +1,115 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:e75d0a08-4b5c-4e66-ae63-80e1d4c7debb
+// Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+//#DECLARE rootFolder string = @"/users/vijeetthomas/SearchFunnel/";
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE inputSourceMarch string  = string.Format("{0}/BaseData_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE inputBaseDataMarch string  = string.Format("{0}/BaseDataMarch.ss",@rootFolder,@endDate);
+#DECLARE inputBaseDataApril string  = string.Format("{0}/BaseDataApril.ss",@rootFolder,@endDate);
+#DECLARE outputComparisonStream3 string = string.Format("{0}/ConversionMarketAnalysisWW.ss", @rootFolder);
+
+
+BaseDataMarch =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataMarch
+    );
+
+SearchesMarch =
+    SELECT Market,
+           COUNT(DISTINCT CVRoot) AS TotalSearchesMarch
+    FROM BaseDataMarch;
+
+SearchClicksAndInstallsMarch = SELECT Market, 
+                                      //SearchTerm, 
+                                      //CVRoot,
+                            //Math.Min(1,COUNT(*)) AS Clicks,
+                            COUNT (DISTINCT CVRoot) AS Clicks,
+                            //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls) AS Installs
+                          FROM BaseDataMarch
+                          WHERE IsClicked == true;
+//WHERE IsClicked == true;;
+
+TotalCLicksAndInstallsMarch =
+    SELECT Market,
+        //SearchTerm,
+        SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+    FROM SearchClicksAndInstallsMarch;
+
+MarchData =
+    SELECT a.*,
+           b.Clicks AS MarchClicks,
+           b.Installs AS MarchInstalls,
+           (b.Clicks*100.0/a.TotalSearchesMarch) AS CTRPercentageMarch,
+           (b.Installs*100.0/a.TotalSearchesMarch) AS ConversionPercentageMarch
+    FROM SearchesMarch AS a
+    INNER JOIN
+        TotalCLicksAndInstallsMarch AS b
+        ON a.Market == b.Market;// AND 
+           //a.SearchTerm == b.SearchTerm;
+
+BaseDataApril =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataApril
+    );
+
+SearchesApril =
+    SELECT Market,
+           //SearchTerm,
+           COUNT(DISTINCT CVRoot) AS TotalSearchesApril
+    FROM BaseDataApril;
+
+SearchClicksAndInstallsApril = SELECT Market, 
+                                      //  SearchTerm, 
+                                      //CVRoot,
+                            //Math.Min(1,COUNT(*)) AS Clicks,
+                            COUNT (DISTINCT CVRoot) AS Clicks,
+                            //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls) AS Installs
+                          FROM BaseDataApril
+                          //WHERE IsClicked == 1;
+                               WHERE IsClicked == true;
+
+TotalCLicksAndInstallsApril = 
+ SELECT Market,
+        //SearchTerm,
+        SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+        FROM SearchClicksAndInstallsApril;
+
+AprilData =
+    SELECT a.*,
+           b.Clicks AS AprilClicks,
+           b.Installs AS AprilInstalls,
+           (b.Clicks * 100.0 / a.TotalSearchesApril) AS CTRPercentageApril,
+           (b.Installs * 100.0 / a.TotalSearchesApril) AS ConversionPercentageApril
+    FROM SearchesApril AS a
+    INNER JOIN
+        TotalCLicksAndInstallsApril AS b
+        ON a.Market == b.Market; //AND 
+            //a.SearchTerm == b.SearchTerm;
+
+
+ComparisonStream =
+    SELECT a.*,
+           b.*.Except( Market),
+           (b.ConversionPercentageApril - a.ConversionPercentageMarch) AS ConversionDiff
+    FROM MarchData AS a
+    INNER JOIN AprilData AS b ON a.Market == b.Market// AND 
+                                 //a.SearchTerm == b.SearchTerm
+                              ;
+
+
+
+OUTPUT ComparisonStream TO SSTREAM @outputComparisonStream3
+CLUSTERED BY Market
+SORTED BY TotalSearchesApril DESC, AprilInstalls DESC, AprilClicks DESC;

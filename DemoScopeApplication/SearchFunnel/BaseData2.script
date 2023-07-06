@@ -1,0 +1,158 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:c21a2f3a-fb59-4d1e-9280-14e3e1b683f8
+// Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE firstDayMarch DateTime = new DateTime(2023, 3, 1);
+#DECLARE firstDayApril DateTime = new DateTime(2023, 4, 1);
+#DECLARE lastDayMarch DateTime = new DateTime(2023, 3, 31);
+#DECLARE lastDayApril DateTime = new DateTime(2023, 4, 30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE firstDayMarchString string = @firstDayMarch.ToString("yyyy-MM-dd");
+#DECLARE firstDayAprilString string = @firstDayApril.ToString("yyyy-MM-dd");
+#DECLARE lastDayMarchString string = @lastDayMarch.ToString("yyyy-MM-dd");
+#DECLARE lastDayMarchString string = @lastDayApril.ToString("yyyy-MM-dd");
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE outputBaseDataMarch string  = string.Format("{0}/BaseDataSFAMarch2.ss",@rootFolder);
+#DECLARE outputBaseDataApril string  = string.Format("{0}/BaseDataSFAApril2.ss",@rootFolder);
+
+//#DECLARE inputSource string = string.Format(@"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/2023/{0:MM}/ExperimentationSearchProduct_{0:yyyy}_{0:MM}_{0:dd}.ss",@endDate);
+//#DECLARE TopSearches string = @"/users/vijeetthomas/SearchFunnel/Daily/TopSearches_2023_01_30.ss";
+
+//inputData =
+//    SELECT *
+//    FROM
+//    (
+//        SSTREAM @inputSource
+//    );
+inputData =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        StartDate  = @firstDayMarchString,
+        EndDate = @lastDayMarchString
+    )
+;
+
+//topSearches =
+//    SELECT *
+//    FROM
+//    (
+//        SSTREAM @TopSearches
+//    );
+
+BaseDataDaily =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           DateId AS Timestamp,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           CVRoot,
+           FlightName,
+           ContentSource,
+           PageImpressionGuid,
+           DeviceIdFull,
+           SearchType,
+           Country AS Market,
+           AttemptedAcquisitionOrInstall IS NULL? 0 : AttemptedAcquisitionOrInstall AS AttemptedAcquisitionOrInstall
+//           AttemptedInstalls IS NULL? 0 : AttemptedInstalls AS AttemptedInstalls,
+//           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+//           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+//           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial
+    FROM inputData
+    WHERE
+    //IsTest != 1 AND 
+    (SearchType == "Regular" OR SearchType == "Autosuggest")
+    AND IsFinalSearch == true
+    AND DeviceClass == "Windows.Desktop"
+    AND SearchTerm.Length > 0
+    AND SlotNumber >= 0
+   // AND ContentSource == "ZeroResult"
+;
+
+inputData2 =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        StartDate  = @firstDayAprilString,
+        EndDate = @endDateString
+    )
+;
+
+//topSearches =
+//    SELECT *
+//    FROM
+//    (
+//        SSTREAM @TopSearches
+//    );
+
+BaseDataDaily2 =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           DateId AS Timestamp,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           CVRoot,
+           FlightName,
+           ContentSource,
+           PageImpressionGuid,
+           DeviceIdFull,
+           SearchType,
+           Country AS Market,
+           AttemptedAcquisitionOrInstall IS NULL? 0 : AttemptedAcquisitionOrInstall AS AttemptedAcquisitionOrInstall
+//           AttemptedInstalls IS NULL? 0 : AttemptedInstalls AS AttemptedInstalls,
+//           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+//           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+//           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial
+    FROM inputData2
+    WHERE
+    //IsTest != 1 AND 
+    (SearchType == "Regular" OR SearchType == "Autosuggest")
+    AND IsFinalSearch == true
+    AND DeviceClass == "Windows.Desktop"
+    AND SearchTerm.Length > 0
+    AND SlotNumber >= 0
+   // AND ContentSource == "ZeroResult"
+;
+
+//BaseDataDaily =
+//    SELECT a.*
+//    FROM BaseDataDaily AS a
+//    INNER JOIN
+//        topSearches AS b
+//        ON a.SearchTerm == b.SearchTerm; 
+
+//BaseDataAS =
+//    SELECT *
+//    FROM BaseDataDaily
+//    WHERE SearchType == "Autosuggest";
+//
+//BaseDatRegular =
+//    SELECT *
+//    FROM BaseDataDaily
+//    WHERE SearchType == "Regular";
+//
+//BaseAgg =
+//    SELECT a.SearchTerm,
+//           a.PageImpressionGuid
+//    FROM BaseDataAS AS a
+//    INNER JOIN
+//        BaseDatRegular AS b
+//        ON a.SearchTerm == b.SearchTerm AND a.PageImpressionGuid == b.PageImpressionGuid;
+//
+//BaseCount =
+//    SELECT COUNT(DISTINCT PageImpressionGuid) AS OverlappingSearches
+//    FROM BaseAgg;
+
+OUTPUT BaseDataDaily TO SSTREAM @outputBaseDataMarch;
+
+OUTPUT BaseDataDaily2 TO SSTREAM @outputBaseDataApril;
+
+//OUTPUT BaseDataDaily 
+//    TO @outputBaseDataCsv
+//    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);
+
+// OUTPUT BaseAgg TO SSTREAM @outputBaseOverlapData;
+// OUTPUT BaseCount TO SSTREAM @outputBaseOverlpaCountData;

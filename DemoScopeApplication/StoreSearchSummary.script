@@ -1,7 +1,7 @@
 ﻿//Script GUID:0a00e1d6-82db-443a-ac6d-b6081e986214
 //Used for tracking history
 
-#DECLARE universalStoreView string = @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"; 
+#DECLARE universalStoreView string = @"/shares/DAP.Prod/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"; 
 #DECLARE madDataStream string = @"/users/honeytalreja/Search/RelevanceScore/2022/07/AppUsagedata_2022_07_11.ss";
 #DECLARE dimAppViewVersion string = "V9";
 #DECLARE streamExpiryString string = "180";

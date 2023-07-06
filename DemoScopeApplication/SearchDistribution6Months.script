@@ -1,0 +1,109 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:4400cbd1-36f2-4e87-b862-c36af0f810dd
+// Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate DateTime = @endDate.AddDays(-180); 
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchesData6Months/";
+#DECLARE outputSearchDataDaily string  = string.Format("{0}/AllSearchData6MonthsDesktopDaily.ss",@rootFolder);
+#DECLARE outputSearchDataMonthly string  = string.Format("{0}/AllSearchData6MonthsDesktopPerMonth.ss",@rootFolder);
+
+#DECLARE streamExpiry string = "180";
+
+inputData =
+    VIEW @"/shares/DAP.Prod/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct_Default.view"
+    PARAMS
+    (
+        startDate  = @startDateString,
+        endDate = @endDateString
+    )
+;
+
+BaseDataDaily =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           DateId AS Timestamp,
+           DateId/100 AS YearMonth,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           ProductTypeName,
+           CVFull.Split('.')[0] AS CVRoot,
+           //FlightName,
+           UserIdFull,
+           ContentSource,
+           PageImpressionGuid,
+           DeviceIdFull,
+           SearchType,
+           Country AS Market,
+           //AttemptedAcquisitionOrInstall IS NULL? 0 : AttemptedAcquisitionOrInstall AS AttemptedAcquisitionOrInstall
+           AttemptedInstalls IS NULL? 0 : AttemptedInstalls AS AttemptedInstalls,
+           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial
+    FROM inputData
+    WHERE
+    IsTest != 1 AND 
+    (SearchType == "Regular" OR SearchType == "Autosuggest")
+    AND IsFinalSearch == true
+    AND DeviceClass == "Windows.Desktop"
+    AND SearchTerm.Length > 0
+    AND SlotNumber >= 0
+   // AND ContentSource == "ZeroResult"
+;
+
+SearchesDaily =
+    SELECT  Timestamp,
+            COUNT(DISTINCT PageImpressionGuid) AS Searches
+    FROM BaseDataDaily
+    ;
+
+SearchClicksAndInstallsDaily = SELECT Timestamp,
+                                       COUNT (DISTINCT PageImpressionGuid) AS Clicks,
+                                        //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                                        SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls) AS Installs
+                          FROM BaseDataDaily
+                               WHERE IsClicked == true;
+
+SearchesAggDaily =
+    SELECT a.*,
+           b.Clicks,
+           b.Installs,
+           (b.Clicks * 100.0 / a.Searches) AS CTR,
+           (b.Installs * 100.0 / a.Searches) AS Conversion
+    FROM SearchesDaily AS a
+    INNER JOIN
+        SearchClicksAndInstallsDaily AS b
+        ON a.Timestamp == b.Timestamp;
+
+SearchesMonthly =
+    SELECT  YearMonth,
+            COUNT(DISTINCT PageImpressionGuid) AS Searches
+    FROM BaseDataDaily
+    ;
+
+SearchClicksAndInstallsMonthly = SELECT YearMonth,
+                                       COUNT (DISTINCT PageImpressionGuid) AS Clicks,
+                                        //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                                        SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls) AS Installs
+                          FROM BaseDataDaily
+                               WHERE IsClicked == true;
+
+SearchesAggMonthly =
+    SELECT a.*,
+           b.Clicks,
+           b.Installs,
+           (b.Clicks * 100.0 / a.Searches) AS CTR,
+           (b.Installs * 100.0 / a.Searches) AS Conversion
+    FROM SearchesMonthly AS a
+    INNER JOIN
+        SearchClicksAndInstallsMonthly AS b
+        ON a.YearMonth == b.YearMonth;
+
+OUTPUT SearchesAggDaily TO SSTREAM @outputSearchDataDaily
+    WITH STREAMEXPIRY @streamExpiry;
+
+OUTPUT SearchesAggMonthly TO SSTREAM @outputSearchDataMonthly
+    WITH STREAMEXPIRY @streamExpiry;

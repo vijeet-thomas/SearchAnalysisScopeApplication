@@ -1,0 +1,39 @@
+﻿//Script GUID:e888b9d6-63e6-4c0f-992f-fd5574cdcfd9
+//Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 6), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-29);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/Search/QOptimizationMetrics";
+#DECLARE inputZeroResultsNew = string.Format("{0}/DateWiseZeroResultsNew_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE inputZeroResultsOld = string.Format("{0}/DateWiseZeroResultsOld_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputDateZeroResultsNew = string.Format("{0}/CountZeroResultsNew_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputDateZeroResultsOld = string.Format("{0}/CountZeroResultsOld_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+
+
+DatewiseZeroResultsNew = 
+    SELECT * FROM (SSTREAM @inputZeroResultsNew);
+
+DatewiseZeroResultsOld = 
+    SELECT * FROM (SSTREAM @inputZeroResultsOld);
+
+DatewiseZeroResultsNew =
+    SELECT  SUM(ZeroSearchesNewQuery) AS ZeroSearches,
+            SUM(TotalSearchesNewQuery) AS TotalSearches,
+            SUM(ZeroSearchesNewQuery)/SUM(TotalSearchesNewQuery) AS ZeroResultsPercentage 
+    FROM DatewiseZeroResultsNew;
+
+DatewiseZeroResultsOld =
+    SELECT  SUM(ZeroSearchesOldQuery) AS ZeroSearches,
+            SUM(TotalSearchesOldQuery) AS TotalSearches,
+            SUM(ZeroSearchesOldQuery)/SUM(TotalSearchesOldQuery) AS ZeroResultsPercentage 
+    FROM DatewiseZeroResultsOld;
+
+OUTPUT DatewiseZeroResultsOld TO SSTREAM @outputDateZeroResultsOld
+;
+
+OUTPUT DatewiseZeroResultsNew TO SSTREAM @outputDateZeroResultsNew
+;

@@ -26,24 +26,22 @@ REFERENCE @"/shares/asimov.prod.data/PublicPartner/Staging/PTPApps/DynamicViewRe
     #DECLARE endDate DateTime = DateTime.Parse("@@endDate@@");
 #ENDIF
 
-#DECLARE streamEndDate DateTime   = @endDate.AddDays(-1);
+#DECLARE streamEndDate DateTime   = @endDate.AddDays(-3);
 #DECLARE streamStartDate DateTime = new DateTime(@streamEndDate.Year, @streamEndDate.Month, 1);
 
 #DECLARE streamEndDateString string   = @streamEndDate.ToString("yyyy-MM-dd");
 #DECLARE streamStartDateString string = @streamStartDate.ToString("yyyy-MM-dd");
-    
-// Date Parameters for getting history - monthend streams for last 12 months.
-#DECLARE historystreamEndDate DateTime   = @streamStartDate.AddDays(-1);
-#DECLARE historystreamStartDate DateTime = new DateTime(Math.Max(@streamEndDate.AddMonths( - 12).Ticks, DateTime.Parse("2020-01-31").Ticks)); //since 6 months of searches data is available
 
 // stream Path Parameters
 #DECLARE rootFolder string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreSearches";
+#DECLARE outputFolder string = "/users/vijeetthomas/SearchFunnel/";
 
-#DECLARE searchTermsHistoryPath string = string.Format("{0}/Daily/TopSearches_%Y_%M_%D.ss", @rootFolder); 
-#DECLARE outputTopSearches_Daily string      = string.Format("{0}/Daily/TopSearches_%Y_%m_%d.ss?date={1}", @rootFolder,@streamEndDateString);
-#DECLARE outputTopSearches_YTD string      = string.Format("{0}/TopSearches_YTD.ss", @rootFolder);
+#DECLARE searchTermsHistoryPath string = string.Format("{0}/Daily/TopSearches_%Y_%M_%D.ss", @outputFolder); 
+#DECLARE outputTopSearches_Daily string      = string.Format("{0}/Daily/TopSearchesUS_%Y_%m_%d.ss?date={1}", @outputFolder,@streamEndDateString);
+#DECLARE outputTopSearches_YTD string      = string.Format("{0}/TopSearchesUS_YTD.ss", @outputFolder);
+#DECLARE outputTotalTokens string      = string.Format("{0}/Daily/TotalTokens_%Y_%m_%d.ss?date={1}", @outputFolder,@streamEndDateString);
 
-#DECLARE streamExpiry string = "370";
+#DECLARE streamExpiry string = "30";
 // --------------------------------------------------------------------------------------------------------------------
 
 // This view will be used to get searches for the Month
@@ -58,21 +56,21 @@ searchView =
 // Lower casing fields used for joins
 searches =
     SELECT @streamEndDate.ToString("yyyyMM") AS YearMonth,
-           SearchTerm.ToLower() AS SearchTerm,
-           DeviceIdFull.ToLower() AS DeviceIdFull
+           SearchTerm.ToLower().Trim() AS SearchTerm,
+           PageImpressionGuid
     FROM searchView
-    WHERE !string.IsNullOrEmpty(DeviceIdFull)
-          AND !string.IsNullOrEmpty(SearchTerm)
+    WHERE !string.IsNullOrEmpty(SearchTerm)
           AND IsTest!= 1  
           AND IsFinalSearch 
           AND SearchType == "Regular"
-          AND DeviceClass == "Windows.Desktop";
+          AND DeviceClass == "Windows.Desktop"
+;
 
 // Search Count for current month
 SearchesAgg = 
     SELECT YearMonth,
            SearchTerm,
-           COUNT(DISTINCT DeviceIdFull) AS SearchCount
+           COUNT(DISTINCT PageImpressionGuid) AS SearchCount
     FROM searches;
 
 // Ranking the searchterms by searcount
@@ -87,9 +85,16 @@ SearchesRanked =
 TopSearches_CurrentMonth = 
     SELECT YearMonth,
            SearchTerm,
-           SearchCount
+           SearchCount,
+           Helper.numberOfWords(SearchTerm) AS NumberOfTokens
     FROM SearchesRanked
-    WHERE RankBySearchCount <= 1000;
+    //WHERE RankBySearchCount <= 10000
+;
+
+totalTokens = SELECT
+    SUM (SearchCount) AS SearchVolume,
+    SUM (NumberOfTokens) AS SumOfTokens
+FROM TopSearches_CurrentMonth;
 
 //output Daily data
 [Privacy.Asset.NonPersonal]
@@ -98,37 +103,20 @@ TO SSTREAM @outputTopSearches_Daily
 CLUSTERED BY SearchTerm, SearchCount
 SORTED BY SearchTerm, SearchCount DESC
 WITH STREAMEXPIRY @streamExpiry;
+
+OUTPUT totalTokens
+TO SSTREAM @outputTotalTokens;
+
+#CS
+
+public class Helper {
+    public static int numberOfWords(string searchTerm) {
+        char[] delimiterChars = { ' ', ',', '.', ':', '\t' };
+
+        string[] words = searchTerm.Split(delimiterChars);
+        return words.Length;
+    }
+}
+#ENDCS
                                    
-                               
-// History streams - Month end streams for the last 12 months
-TopSearches_Last12Months =
-    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/DynamicView_MonthEndStreams.view"
-    PARAMS
-    (
-        StreamSet = @searchTermsHistoryPath,
-        StartDate = @historystreamStartDate,
-        EndDate = @historystreamEndDate,
-        Schema = String.Join(",", new[]{
-                   "YearMonth : string ",
-                   "SearchTerm : string ",
-                   "SearchCount : long "})
-    );
-
-//Combine last 12 months data with current month
-searches_YTD = 
-    SELECT * 
-    FROM TopSearches_CurrentMonth
-    UNION ALL
-    SELECT *
-    FROM TopSearches_Last12Months;
- 
-
-                                   
-//output YTD data
-[Privacy.Asset.NonPersonal]
-OUTPUT searches_YTD
-TO SSTREAM @outputTopSearches_YTD
-CLUSTERED BY SearchTerm, SearchCount
-SORTED BY SearchTerm, SearchCount DESC
-WITH STREAMEXPIRY @streamExpiry;
-
+                              

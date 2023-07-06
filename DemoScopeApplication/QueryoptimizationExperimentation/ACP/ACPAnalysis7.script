@@ -1,0 +1,41 @@
+﻿//Script GUID:0993cf5a-8df7-4cce-ad5b-fc4147d98800
+//Used for tracking history
+
+#DECLARE inputStreamChanges string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermsAndProductsChangesFromUniProd.ss";
+#DECLARE inputStreamProductChanges string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermsChangesFromUniProd.ss";
+
+#DECLARE inputStream string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermAnalysisFromUniProd.ss";
+#DECLARE inputStreamProduct string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermProductAnalysisFromUniProd.ss";
+
+#DECLARE outputStreamChanges string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermsAndProductsChangesFromUniProdFiltered.ss";
+#DECLARE outputStreamProductChanges string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermsChangesFromUniProdFiltered.ss";
+
+#DECLARE outputStream string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermAnalysisFromUniProdFiltered.ss";
+#DECLARE outputStreamProduct string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermProductAnalysisFromUniProdFiltered.ss";
+
+#DECLARE outputStreamChangesCsv string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermsAndProductsChangesFromUniProdFiltered.csv";
+#DECLARE outputStreamProductChangesCsv string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermsChangesFromUniProdFiltered.csv";
+
+#DECLARE outputStreamCsv string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermAnalysisFromUniProdFiltered.csv";
+#DECLARE outputStreamProductCsv string = @"/users/vijeetthomas/ACPAnalysis3/SearchTermProductAnalysisFromUniProdFiltered.csv";
+
+input1 = SELECT * FROM (SSTREAM @inputStreamChanges)
+    WHERE SearchTerm IN ("google","chrome","games","dvd","gmail","excel","gta","free games","adobe","amazon","hbo","disney","facebook","itunes","fortnite");
+
+input2 = SELECT * FROM (SSTREAM @inputStreamProductChanges)
+    WHERE SearchTerm IN ("google","chrome","games","dvd","gmail","excel","gta","free games","adobe","amazon","hbo","disney","facebook","itunes","fortnite");
+
+input3 = SELECT * FROM (SSTREAM @inputStream)
+    WHERE SearchTerm IN ("google","chrome","games","dvd","gmail","excel","gta","free games","adobe","amazon","hbo","disney","facebook","itunes","fortnite");
+
+input4 = SELECT * FROM (SSTREAM @inputStreamProduct)
+    WHERE SearchTerm IN ("google","chrome","games","dvd","gmail","excel","gta","free games","adobe","amazon","hbo","disney","facebook","itunes","fortnite");
+
+OUTPUT input1 TO SSTREAM @outputStreamChanges;
+OUTPUT input1 TO @outputStreamChangesCsv USING Outputters.Csv(outputHeader : true);
+OUTPUT input2 TO SSTREAM @outputStreamProductChanges;
+OUTPUT input2 TO @outputStreamProductChangesCsv USING Outputters.Csv(outputHeader : true);
+OUTPUT input3 TO SSTREAM @outputStream;
+OUTPUT input3 TO @outputStreamCsv USING Outputters.Csv(outputHeader : true);
+OUTPUT input4 TO SSTREAM @outputStreamProduct;
+OUTPUT input4 TO @outputStreamProductCsv USING Outputters.Csv(outputHeader : true);

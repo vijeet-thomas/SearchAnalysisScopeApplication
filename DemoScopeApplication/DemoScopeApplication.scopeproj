@@ -38,7 +38,28 @@
     <Script Include="ACP\ACPAnalysis7.script" />
     <Script Include="ACP\ACPTop1500SearchTerms.script" />
     <Script Include="AndroidRnRExtract.script" />
+    <Script Include="AppVerUserDistribution.script" />
     <Script Include="ComparisonStream.script" />
+    <Script Include="Conversion Analysis\PageImpressionsAutosuggestAnalysis.script" />
+    <Script Include="Conversion Analysis\OptimusAutosuggestAnalysis.script" />
+    <Script Include="Conversion Analysis\OptimusRegularAnalysis.script" />
+    <Script Include="Conversion Analysis\PageImpressionsRegularAnalysis.script" />
+    <Script Include="Conversion Analysis\ConversionUniversalStoreAnalysis.script" />
+    <Script Include="ConversionOptimusAnalysis.script" />
+    <Script Include="ConversionOSAnalysis.script" />
+    <Script Include="PageImpressionsGetsAnalysis.script" />
+    <Script Include="ConversionSFAAnalysis.script" />
+    <Script Include="InApps_Revenue_v2.script" />
+    <Script Include="Revenue.script" />
+    <Script Include="Scope2.script" />
+    <Script Include="SearchDistribution6Months.script" />
+    <Script Include="SearchFunnel\InApps_Revenue_v2.script" />
+    <Script Include="SearchFunnel\ZeroSearchesAnalysisMarch.script" />
+    <Script Include="SearchFunnel\SearchConversionMarketLevelData.script" />
+    <Script Include="SearchFunnel\UserCount.script" />
+    <Script Include="SearchFunnel\ZeroSearchesAnalysis.script" />
+    <Script Include="UrlDistribution.script" />
+    <Script Include="Countrows.script" />
     <Script Include="Fraud Analysis.script" />
     <Script Include="GetProductNames.script" />
     <Script Include="hackathonEngagementPercentage.script" />
@@ -51,15 +72,53 @@
     <Script Include="MADCoverageCheck.script" />
     <Script Include="MADScript2.script" />
     <Script Include="MADScript3.script" />
+    <Script Include="NewQueryvsOldQuery.script" />
     <Script Include="PageImpressionsData.script" />
     <Script Include="PerProductDetails.script" />
     <Script Include="Product.script" />
+    <Script Include="QueryoptimizationExperimentation\ACP\ACP Analysis.script" />
+    <Script Include="QueryoptimizationExperimentation\AggregatedConversion.script" />
+    <Script Include="QueryoptimizationExperimentation\MultiTermVsSingleTerm.script" />
+    <Script Include="QueryoptimizationExperimentation\MutliTermMetrics.script" />
+    <Script Include="QueryoptimizationExperimentation\CountZeroResults.script" />
+    <Script Include="QueryoptimizationExperimentation\ExperimentationGuardRail.script" />
+    <Script Include="QueryoptimizationExperimentation\ForzaZeroResults.script" />
+    <Script Include="QueryoptimizationExperimentation\NewQueryvsOldQuery.script" />
+    <Script Include="QueryoptimizationExperimentation\SingleTermMetrics.script" />
+    <Script Include="QueryoptimizationExperimentation\Top1000Conversion.script" />
+    <Script Include="QueryoptimizationExperimentation\ZeroAllConversionOldQuery.script" />
+    <Script Include="QueryoptimizationExperimentation\ZeroResultsByDay.script" />
+    <Script Include="QueryoptimizationExperimentation\ZeroResultsCheck.script" />
+    <Script Include="QueryoptimizationExperimentation\ZeroResultsConversionOldQuery.script" />
+    <Script Include="QueryoptimizationExperimentation\ZeroResultsPercentage.script" />
     <Script Include="Ratings analysis.script" />
     <Script Include="MADScript1.script" />
     <Script Include="RatingsBaseAnalysis.script" />
+    <Script Include="RatingsFraudAnalysis.script" />
+    <Script Include="RelevanceScoreADF.script">
+      <RemoveUselessParameters>False</RemoveUselessParameters>
+      <ScopeOldParameters>startDate=(\"26-11-2022\"),inputStream=(\"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/11/AggregatedScoreFraud_2022_11_26.ss\")</ScopeOldParameters>
+      <ScopeClusterParameters>startDate=(\"2022-11-26\"),inputStream=(\"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/11/AggregatedScoreFraud_2022_11_26.ss\")</ScopeClusterParameters>
+    </Script>
     <Script Include="Scope.script" />
     <Script Include="ScoreCheckAnalysis.script" />
     <Script Include="ScorePopularityAnalysis.script" />
+    <Script Include="SearchConversionMetrics\BusinessMetrics.script" />
+    <Script Include="SearchConversionMetrics\BusinessMetricsSessionLevel.script" />
+    <Script Include="SearchConversionMetrics\BusinessMetricsAutoIncluded.script" />
+    <Script Include="SearchConversionMetrics\GuardRailMetrics.script" />
+    <Script Include="SearchConversionMetrics\GuardRailMetricsSessionLevel.script" />
+    <Script Include="SearchFiltersAnalysis.script" />
+    <Script Include="SearchFunnel\BaseData.script" />
+    <Script Include="SearchFunnel\ASConversionData.script" />
+    <Script Include="SearchFunnel\BaseData2.script" />
+    <Script Include="SearchFunnel\SearchConversionOverallData.script" />
+    <Script Include="SearchFunnel\RegularConversionData.script" />
+    <Script Include="SearchFunnel\SearchConversionProductLevelData.script" />
+    <Script Include="SearchFunnel\SearchConversionSearchTermLevelData.script" />
+    <Script Include="SearchFunnel\SearchesData.script" />
+    <Script Include="SearchFunnel\SerachConversionDropsProductNames.script" />
+    <Script Include="SearchFunnel\TotalSearches.script" />
     <Script Include="StoreAutoSuggestSummary.script" />
     <Script Include="StoreSearchSummary.script" />
     <Script Include="Script1.script" />
@@ -96,8 +155,71 @@
     <ScriptCode Include="AndroidRnRExtract.script.cs">
       <DependentUpon>AndroidRnRExtract.script</DependentUpon>
     </ScriptCode>
+    <ScriptCode Include="AppVerUserDistribution.script.cs">
+      <DependentUpon>AppVerUserDistribution.script</DependentUpon>
+    </ScriptCode>
     <ScriptCode Include="ComparisonStream.script.cs">
       <DependentUpon>ComparisonStream.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Conversion Analysis\PageImpressionsAutosuggestAnalysis.script.cs">
+      <DependentUpon>Conversion Analysis\PageImpressionsAutosuggestAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Conversion Analysis\OptimusAutosuggestAnalysis.script.cs">
+      <DependentUpon>Conversion Analysis\OptimusAutosuggestAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Conversion Analysis\OptimusRegularAnalysis.script.cs">
+      <DependentUpon>Conversion Analysis\OptimusRegularAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Conversion Analysis\PageImpressionsRegularAnalysis.script.cs">
+      <DependentUpon>Conversion Analysis\PageImpressionsRegularAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Conversion Analysis\ConversionUniversalStoreAnalysis.script.cs">
+      <DependentUpon>Conversion Analysis\ConversionUniversalStoreAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="ConversionOptimusAnalysis.script.cs">
+      <DependentUpon>ConversionOptimusAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="ConversionOSAnalysis.script.cs">
+      <DependentUpon>ConversionOSAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="PageImpressionsGetsAnalysis.script.cs">
+      <DependentUpon>PageImpressionsGetsAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="ConversionSFAAnalysis.script.cs">
+      <DependentUpon>ConversionSFAAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="InApps_Revenue_v2.script.cs">
+      <DependentUpon>InApps_Revenue_v2.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Revenue.script.cs">
+      <DependentUpon>Revenue.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Scope2.script.cs">
+      <DependentUpon>Scope2.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchDistribution6Months.script.cs">
+      <DependentUpon>SearchDistribution6Months.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\InApps_Revenue_v2.script.cs">
+      <DependentUpon>SearchFunnel\InApps_Revenue_v2.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\ZeroSearchesAnalysisMarch.script.cs">
+      <DependentUpon>SearchFunnel\ZeroSearchesAnalysisMarch.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\SearchConversionMarketLevelData.script.cs">
+      <DependentUpon>SearchFunnel\SearchConversionMarketLevelData.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\UserCount.script.cs">
+      <DependentUpon>SearchFunnel\UserCount.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\ZeroSearchesAnalysis.script.cs">
+      <DependentUpon>SearchFunnel\ZeroSearchesAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="UrlDistribution.script.cs">
+      <DependentUpon>UrlDistribution.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Countrows.script.cs">
+      <DependentUpon>Countrows.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="Fraud Analysis.script.cs">
       <DependentUpon>Fraud Analysis.script</DependentUpon>
@@ -126,8 +248,53 @@
     <ScriptCode Include="MADScript3.script.cs">
       <DependentUpon>MADScript3.script</DependentUpon>
     </ScriptCode>
+    <ScriptCode Include="NewQueryvsOldQuery.script.cs">
+      <DependentUpon>NewQueryvsOldQuery.script</DependentUpon>
+    </ScriptCode>
     <ScriptCode Include="PageImpressionsData.script.cs">
       <DependentUpon>PageImpressionsData.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\AggregatedConversion.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\AggregatedConversion.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\MultiTermVsSingleTerm.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\MultiTermVsSingleTerm.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\MutliTermMetrics.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\MutliTermMetrics.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\CountZeroResults.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\CountZeroResults.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\ExperimentationGuardRail.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\ExperimentationGuardRail.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\ForzaZeroResults.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\ForzaZeroResults.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\NewQueryvsOldQuery.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\NewQueryvsOldQuery.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\SingleTermMetrics.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\SingleTermMetrics.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\Top1000Conversion.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\Top1000Conversion.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\ZeroAllConversionOldQuery.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\ZeroAllConversionOldQuery.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\ZeroResultsByDay.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\ZeroResultsByDay.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\ZeroResultsCheck.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\ZeroResultsCheck.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\ZeroResultsConversionOldQuery.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\ZeroResultsConversionOldQuery.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="QueryoptimizationExperimentation\ZeroResultsPercentage.script.cs">
+      <DependentUpon>QueryoptimizationExperimentation\ZeroResultsPercentage.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="Ratings analysis.script.cs">
       <DependentUpon>Ratings analysis.script</DependentUpon>
@@ -138,11 +305,59 @@
     <ScriptCode Include="RatingsBaseAnalysis.script.cs">
       <DependentUpon>RatingsBaseAnalysis.script</DependentUpon>
     </ScriptCode>
+    <ScriptCode Include="RatingsFraudAnalysis.script.cs">
+      <DependentUpon>RatingsFraudAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="RelevanceScoreADF.script.cs">
+      <DependentUpon>RelevanceScoreADF.script</DependentUpon>
+    </ScriptCode>
     <ScriptCode Include="ScoreCheckAnalysis.script.cs">
       <DependentUpon>ScoreCheckAnalysis.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="ScorePopularityAnalysis.script.cs">
       <DependentUpon>ScorePopularityAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchConversionMetrics\BusinessMetrics.script.cs">
+      <DependentUpon>SearchConversionMetrics\BusinessMetrics.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchConversionMetrics\BusinessMetricsSessionLevel.script.cs">
+      <DependentUpon>SearchConversionMetrics\BusinessMetricsSessionLevel.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchConversionMetrics\BusinessMetricsAutoIncluded.script.cs">
+      <DependentUpon>SearchConversionMetrics\BusinessMetricsAutoIncluded.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchConversionMetrics\GuardRailMetrics.script.cs">
+      <DependentUpon>SearchConversionMetrics\GuardRailMetrics.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchConversionMetrics\GuardRailMetricsSessionLevel.script.cs">
+      <DependentUpon>SearchConversionMetrics\GuardRailMetricsSessionLevel.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFiltersAnalysis.script.cs">
+      <DependentUpon>SearchFiltersAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\ASConversionData.script.cs">
+      <DependentUpon>SearchFunnel\ASConversionData.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\BaseData.script.cs">
+      <DependentUpon>SearchFunnel\BaseData.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\SearchConversionOverallData.script.cs">
+      <DependentUpon>SearchFunnel\SearchConversionOverallData.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\SearchConversionProductLevelData.script.cs">
+      <DependentUpon>SearchFunnel\SearchConversionProductLevelData.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\SearchConversionSearchTermLevelData.script.cs">
+      <DependentUpon>SearchFunnel\SearchConversionSearchTermLevelData.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\SearchesData.script.cs">
+      <DependentUpon>SearchFunnel\SearchesData.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\SerachConversionDropsProductNames.script.cs">
+      <DependentUpon>SearchFunnel\SerachConversionDropsProductNames.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="SearchFunnel\TotalSearches.script.cs">
+      <DependentUpon>SearchFunnel\TotalSearches.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="StoreAutoSuggestSummary.script.cs">
       <DependentUpon>StoreAutoSuggestSummary.script</DependentUpon>
@@ -195,6 +410,11 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="ACP" />
+    <Folder Include="Conversion Analysis" />
+    <Folder Include="SearchFunnel" />
+    <Folder Include="QueryoptimizationExperimentation" />
+    <Folder Include="QueryoptimizationExperimentation\ACP\" />
+    <Folder Include="SearchConversionMetrics" />
   </ItemGroup>
   <Import Project="$(AppData)\Microsoft\ScopeStudio\MsBuild\1.0\Scope.targets" />
 </Project>

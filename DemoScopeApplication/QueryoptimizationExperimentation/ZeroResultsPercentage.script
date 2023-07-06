@@ -1,0 +1,117 @@
+﻿//Script GUID:6f76136a-ced2-41a0-871d-bc347c96ee1d
+//Used for tracking history
+
+//Script GUID:e02f0768-7b89-433a-bb71-658ecb38fdfe
+//Used for tracking history
+
+//Script GUID:d310c213-87a4-4fdc-a01c-3fe7a6f85b92
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 6), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-29);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/Search/QOptimizationMetrics";
+#DECLARE outputZeroResults = string.Format("{0}/ZeroResultsPercentageDiffUS_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputZeroResultsCsv = string.Format("{0}/ZeroResultsPercentageDiffUS_{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+
+inputData =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    )
+;
+
+BaseDataDailyNew =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName LIKE "%SFA-EXP-d161b448ec%" 
+          AND Country == "US"
+          //AND Country IN ("FR","DE","MX","ES","BR")
+          //AND ContentSource == "ZeroResult"
+;
+
+BaseDataDailyOld =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName NOT LIKE "%SFA-EXP-d161b448ec%" 
+          //AND ContentSource == "ZeroResult"
+          //AND Country IN ("FR","DE","MX","ES","BR")
+          AND Country == "US"
+          ;
+
+ZeroSearchesDailyNewQuery =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS ZeroSearchesNewQuery
+    FROM BaseDataDailyNew
+    WHERE ContentSource == "ZeroResult"
+;
+
+SearchesDailyNewQuery =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearchesNewQuery
+    FROM BaseDataDailyNew;
+
+ZeroSearchesDailyOldQuery =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS ZeroSearchesOldQuery
+    FROM BaseDataDailyOld
+    WHERE ContentSource == "ZeroResult"
+;
+
+SearchesDailyOldQuery =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearchesOldQuery
+    FROM BaseDataDailyOld;
+
+ZeroResults = 
+    SELECT a.*,
+           c.TotalSearchesNewQuery,
+           b.ZeroSearchesOldQuery,
+           d.TotalSearchesOldQuery
+    FROM ZeroSearchesDailyNewQuery AS a 
+         INNER JOIN ZeroSearchesDailyOldQuery AS b 
+         ON a.SearchTerm == b.SearchTerm AND a.Country == b.Country
+         INNER JOIN SearchesDailyNewQuery AS c 
+         ON a.SearchTerm == c.SearchTerm AND a.Country == c.Country
+         INNER JOIN SearchesDailyOldQuery AS d 
+         ON a.SearchTerm == d.SearchTerm AND a.Country == d.Country
+;
+
+ZeroResultsPercentage = 
+    SELECT *,
+           (ZeroSearchesNewQuery*100.0/TotalSearchesNewQuery) AS ZeroSeacrhesNewPercentage,
+           (ZeroSearchesOldQuery*100.0/TotalSearchesOldQuery) AS ZeroSearchesOldPercentage
+          FROM ZeroResults;
+
+ZeroResultsPercentage = 
+    SELECT *,
+           (ZeroSeacrhesNewPercentage -  ZeroSearchesOldPercentage) AS PercentageDiff
+    FROM ZeroResultsPercentage
+;
+
+OUTPUT ZeroResultsPercentage TO SSTREAM @outputZeroResults
+        CLUSTERED BY SearchTerm, Country
+        SORTED BY PercentageDiff DESC, TotalSearchesNewQuery DESC
+;
+
+OUTPUT ZeroResultsPercentage 
+    TO @outputZeroResultsCsv
+    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);

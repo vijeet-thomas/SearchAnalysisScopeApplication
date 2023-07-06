@@ -1,0 +1,211 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:b4a0b2eb-080f-48d6-9230-a6d12378871b
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 5), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+#DECLARE outputRoot string = @"users/vijeetthomas";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/SearchFiltersAnalysisPerSearch2.ss", @outputRoot);
+#DECLARE outputStreamPerSession string = string.Format("{0}/SearchFiltersAnalysisPerSession2.ss", @outputRoot);
+#DECLARE streamExpiryString string = "60";
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_PageImpressions/UniversalStore_PageImpressions.view";
+//#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+
+inputData =
+    VIEW @SFAView
+    PARAMS 
+    (
+        startDate = @startDate1DayString,
+        endDate = @endDateString
+    );
+
+AllSearches =
+    SELECT *
+    FROM inputData
+    WHERE ReferrerUri.Contains("pages/searchResults")
+         // OR Uri.Contains("pages/searchResults")
+;
+
+TotalSearchesPerSearch =
+    SELECT COUNT(DISTINCT ImpressionGuid) AS TotalSearches
+    FROM AllSearches;
+//
+//CTRPerSearch =
+//    SELECT COUNT(DISTINCT ImpressionGuid) AS ClickCount
+//    FROM SFADataNew
+//    WHERE Uri.Contains("pages/pdp") AND ReferrerUri.Contains("pages/searchResults");
+//
+//InstallPerSearch =
+//    SELECT SUM(AttemptedAcquisitionCount) AS InstallCount
+//    FROM SFADataNew
+//    WHERE ReferrerUri.Contains("pages/searchResults")
+//          AND AttemptedAcquisitionCount > 0;
+
+TotalSearchesFiltersPerSearch1 =
+    SELECT COUNT(DISTINCT ImpressionGuid) AS FilterOnDept
+    FROM AllSearches
+    WHERE //Uri.Contains("mediaType=all")OR
+        !ReferrerUri.Contains("mediaType=all")
+;
+
+TotalSearchesFiltersPerSearch2 =
+    SELECT COUNT(DISTINCT ImpressionGuid) AS FilterOnAge
+    FROM AllSearches
+    WHERE //Uri.Contains("UserAge%3Dall")OR 
+        
+          ReferrerUri.Contains("UserAge%3DTO17")
+          OR ReferrerUri.Contains("UserAge%3DTO16")
+          OR ReferrerUri.Contains("UserAge%3DTO15")
+          OR ReferrerUri.Contains("UserAge%3DTO14")
+          OR ReferrerUri.Contains("UserAge%3DTO13")
+          OR ReferrerUri.Contains("UserAge%3DTO12")
+          OR ReferrerUri.Contains("UserAge%3DTO11")
+          OR ReferrerUri.Contains("UserAge%3DTO10")
+          OR ReferrerUri.Contains("UserAge%3DTO9")
+          OR ReferrerUri.Contains("UserAge%3DTO8")
+          OR ReferrerUri.Contains("UserAge%3DTO7")
+          OR ReferrerUri.Contains("UserAge%3DTO6")
+          OR ReferrerUri.Contains("UserAge%3DTO5")
+          OR ReferrerUri.Contains("UserAge%3DTO4")
+          OR ReferrerUri.Contains("UserAge%3DTO3")
+          OR ReferrerUri.Contains("UserAge%3DTO2")
+          OR ReferrerUri.Contains("UserAge%3DTO1")
+    
+;
+
+TotalSearchesFiltersPerSearch3 =
+    SELECT COUNT(DISTINCT ImpressionGuid) AS FilterOnPrice
+    FROM AllSearches
+    WHERE //Uri.Contains("PriceType%3Dall")OR
+          ReferrerUri.Contains("PriceType%3DPaid")
+    OR ReferrerUri.Contains("PriceType%3DFree")
+    OR ReferrerUri.Contains("PriceType%3DSale")
+;
+
+TotalSearchesFiltersPerSearch4 =
+    SELECT COUNT(DISTINCT ImpressionGuid) AS FilterOnCategory
+    FROM AllSearches
+    WHERE //Uri.Contains("PriceType%3Dall")OR
+          ReferrerUri.Contains("Category")
+;
+
+TotalSearchesFiltersPerSearch5 =
+    SELECT COUNT(DISTINCT CVRoot) AS FilterOnSubCategory
+    FROM AllSearches
+    WHERE //Uri.Contains("PriceType%3Dall")OR
+          ReferrerUri.Contains("SubCategory")
+    //OR Uri.Contains("PriceType=all")
+;
+
+NoFiltersPerSearch2 =
+    SELECT COUNT(DISTINCT ImpressionGuid) AS TotalSearchesWithNoFilters2
+    FROM AllSearches
+    WHERE //Uri.Contains("mediaType=all&filters=UserAge%3Dall%26PriceType%3Dall")OR
+        ReferrerUri.Contains("mediaType=all&filters=UserAge%3Dall%26PriceType%3Dall")
+     //OR Uri.Contains("mediaType=all&filters=availableOn")
+          OR ReferrerUri.Contains("mediaType=all&filters=availableOn")
+    
+;
+
+SearchFiltersSummary = 
+    SELECT * FROM TotalSearchesPerSearch CROSS JOIN 
+// CTRPerSearch CROSS JOIN 
+//InstallPerSearch CROSS JOIN 
+ TotalSearchesFiltersPerSearch1
+                  CROSS JOIN TotalSearchesFiltersPerSearch2
+                  CROSS JOIN TotalSearchesFiltersPerSearch3
+                  CROSS JOIN TotalSearchesFiltersPerSearch4
+                  CROSS JOIN TotalSearchesFiltersPerSearch5
+                  CROSS JOIN NoFiltersPerSearch2
+// CTRFiltersPerSearch CROSS JOIN 
+// InstallFiltersPerSearch
+                  ;
+
+OUTPUT SearchFiltersSummary TO SSTREAM @outputStreamPerSearch;
+
+TotalSearchesPerSession =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM AllSearches;
+
+
+TotalSearchesFiltersPerSession1 =
+    SELECT COUNT(DISTINCT CVRoot) AS FilterOnDept
+    FROM AllSearches
+    WHERE //Uri.Contains("mediaType=all")OR
+        !ReferrerUri.Contains("mediaType=all")
+;
+
+TotalSearchesFiltersPerSession2 =
+    SELECT COUNT(DISTINCT CVRoot) AS FilterOnAge
+    FROM AllSearches
+    WHERE //Uri.Contains("UserAge%3Dall")OR
+        ReferrerUri.Contains("UserAge%3DTO")
+    //OR Uri.Contains("UserAge=all")
+          
+;
+
+TotalSearchesFiltersPerSession3 =
+    SELECT COUNT(DISTINCT CVRoot) AS FilterOnPrice
+    FROM AllSearches
+    WHERE //Uri.Contains("PriceType%3Dall") OR
+          ReferrerUri.Contains("PriceType%3DPaid")
+    OR ReferrerUri.Contains("PriceType%3DFree")
+    OR ReferrerUri.Contains("PriceType%3DSale")
+;
+
+TotalSearchesFiltersPerSession4 =
+    SELECT COUNT(DISTINCT CVRoot) AS FilterOnCategory
+    FROM AllSearches
+    WHERE //Uri.Contains("PriceType%3Dall")OR
+          ReferrerUri.Contains("Category")
+;
+
+TotalSearchesFiltersPerSession5 =
+    SELECT COUNT(DISTINCT CVRoot) AS FilterOnSubCategory
+    FROM AllSearches
+    WHERE //Uri.Contains("PriceType%3Dall")OR
+          ReferrerUri.Contains("SubCategory")
+;
+
+NoFiltersPerSession =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSearchesWithNoFilters
+    FROM AllSearches
+    WHERE //Uri.Contains("mediaType=all&filters=UserAge%3Dall%26PriceType%3Dall")OR
+        ReferrerUri.Contains("mediaType=all&filters=UserAge%3Dall%26PriceType%3Dall")
+    //OR Uri.Contains("mediaType=all&filters=availableOn")
+          OR ReferrerUri.Contains("mediaType=all&filters=availableOn")
+;
+
+//
+//CTRFiltersPerSession =
+//    SELECT COUNT(DISTINCT ImpressionGuid) AS ClickCountWithFilters
+//    FROM SFADataNew
+//    WHERE Uri.Contains("pages/pdp") AND ReferrerUri.Contains("pages/searchResults")
+//    AND !ReferrerUri.Contains("mediaType=all&filters=UserAge%3Dall%26PriceType%3Dall");
+//
+//InstallFiltersPerSession =
+//    SELECT SUM(AttemptedAcquisitionCount) AS InstallCountWithFilters
+//    FROM SFADataNew
+//    WHERE ReferrerUri.Contains("pages/searchResults") AND AttemptedAcquisitionCount > 0
+//    AND !ReferrerUri.Contains("mediaType=all&filters=UserAge%3Dall%26PriceType%3Dall");
+//
+
+SearchFiltersSummaryPerSession = 
+    SELECT * FROM TotalSearchesPerSession CROSS JOIN 
+// CTRPerSearch CROSS JOIN 
+//InstallPerSearch CROSS JOIN 
+ TotalSearchesFiltersPerSession1
+                  CROSS JOIN TotalSearchesFiltersPerSession2
+                  CROSS JOIN TotalSearchesFiltersPerSession3
+                  CROSS JOIN TotalSearchesFiltersPerSession4
+                  CROSS JOIN TotalSearchesFiltersPerSession5
+                  CROSS JOIN NoFiltersPerSession
+// CTRFiltersPerSearch CROSS JOIN 
+// InstallFiltersPerSearch
+                  ;
+
+OUTPUT SearchFiltersSummaryPerSession TO SSTREAM @outputStreamPerSession;
+

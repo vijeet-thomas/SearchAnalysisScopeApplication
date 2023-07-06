@@ -1,0 +1,34 @@
+﻿//Script GUID:11bd1e66-4b4b-4877-9b3e-d95fc855aac6
+//Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 7), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-29);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/Search/QOptimizationMetrics";
+
+#DECLARE outputStreamAllConversion = string.Format("{0}/AllOldQueryConversion_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputStreamZeroComparison = string.Format("{0}/ZeroSearchTermComparison{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputStreamCombinedData = string.Format("{0}/ConversionComparison_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+
+
+AllData = SELECT "AllData" AS GroupName,
+                 SUM(TotalSearchesOldQuery) AS TotalSearches,
+                 SUM(ClicksOldQuery) AS TotalClicks,
+                 SUM(InstallsOldQuery) AS TotalInstalls
+    FROM (SSTREAM @outputStreamAllConversion);
+
+ZeroSearchesData = SELECT "ZeroSearchesGroup" AS GroupName,
+                          SUM(TotalSearchesOldQuery) AS TotalSearches,
+                          SUM(ClicksOldQuery) AS TotalClicks,
+                          SUM(InstallsOldQuery) AS TotalInstalls
+                   FROM (SSTREAM @outputStreamZeroComparison);
+
+CombinedData =
+    SELECT *
+    FROM AllData
+    UNION ALL
+    SELECT *
+    FROM ZeroSearchesData;
+
+OUTPUT CombinedData TO SSTREAM @outputStreamCombinedData;

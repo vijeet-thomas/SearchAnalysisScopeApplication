@@ -1,28 +1,105 @@
 ﻿//Script GUID:12cfcbe5-030b-4697-a159-af6172566432
 //Used for tracking history
 
-#DECLARE timePeriodDays int = 175;
-#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-8), DateTime.Parse("@@endDate@@"));
-#DECLARE startDate DateTime = @endDate.AddDays( - (@timePeriodDays - 1));
-#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
-#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+//Script GUID:dfd1e8c6-a570-45aa-8807-22682885a8b1
+//Used for tracking history
 
-// Input Streams and Views
-#DECLARE inputRoot string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/";
-#DECLARE installsPattern string = @"/%Y/%m/AttemptedInstallsByProductidMarket_%Y_%m_%d.ss";
+/// <summary>
+///
+/// @author katherinezhu
+/// @owner katherinezhu
+/// Xflow Link: 
+/// </summary>
 
-installs =
+// --------------------------------------------------------------------------------------------------------------------
+// Modules & References
+// --------------------------------------------------------------------------------------------------------------------
+// NGP Tagging Module
+#DECLARE PrivacyAnnotationPath string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/NGP/Resources/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppPackageMappingModule.module";
+// in order to use the DimGeography view, has to include this module and reference per wiki example
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module"; 
+
+REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Microsoft.Telemetry.Cosmos.Application.dll";
+REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Device/Microsoft.Telemetry.Common.Utilities.dll";
+
+USING Microsoft.Telemetry.Cosmos.Application;
+USING Microsoft.Telemetry.Common.Utilities;
+
+MODULE "/shares/asimov.prod.data/Public/Resources/Latest/Dimensions/CommonDimensions.module" AS CommonDimensions;
+
+// --------------------------------------------------------------------------------------------------------------------
+// Variables and Defaults
+// --------------------------------------------------------------------------------------------------------------------
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+#DECLARE endDateId string = @endDate.ToString("yyyyMMdd");
+
+// Output
+#DECLARE outputRoot string = @"users/vijeetthomas/";
+#DECLARE outputStream_Installs string = string.Format("{0}/AttemptedInstallsByProductidMarket_{1:yyyy}_{1:MM}_{1:dd}.ss", @outputRoot.TrimEnd(new[]{ '/' }), @endDate);
+#DECLARE streamExpiryString string = "179";
+// --------------------------------------------------------------------------------------------------------------------
+
+
+// --------------------------------------------------------------------------------------------------------------------
+// Streamsets and Views
+// --------------------------------------------------------------------------------------------------------------------
+
+#DECLARE aggInstallView_Input string = @"/shares/asimov.prod.data/Public/Processed/Usage/Install/Aggregates/AppInstallAttempts_v08.view";
+#DECLARE dimGeographyView string = @"/shares/asimov.prod.data/Public/Processed/Common/Dimensions/DimGeography/DimGeography.view";
+
+dimGeography = VIEW @dimGeographyView 
+    PARAMS 
     (
-    SSTREAM STREAMSET @inputRoot
-            PATTERN @installsPattern
-            RANGE __date = [@startDateString, @endDateString]
+        version = "V3"
     );
+// --------------------------------------------------------------------------------------------------------------------
 
-installsByProductMarket =
-    SELECT ProductId,
-           Market,
-           SUM(Installs) AS InstallsCount
-    FROM installs
-    WHERE !string.IsNullOrWhiteSpace(ProductId);
+// --------------------------------------------------------------------------------------------------------------------
+// Query
+// --------------------------------------------------------------------------------------------------------------------
+SuccessfulAppInstalls_Input = 
+    SELECT
+          i.DeviceId
+        , i.ProductId.ToUpperInvariant() AS ProductId
+        , g.ISO2CharCountryCode.ToUpperInvariant() AS Market
+        , Format.GetOSCodeNameByBuildNumber(Convert.ToString(i.OSBuild)) AS OSRelease
+        , i.IsInteractive
+        , i.InstallInitiator
+        , i.CallerApplicationId
+    FROM (
+    VIEW  @aggInstallView_Input
+                PARAMS (
+                    startDate = @endDate,
+                    endDate = @endDate,
+                    onlyAcquisitions = true,
+                    onlyCompleted = true 
+                    )) AS i
+    INNER JOIN dimGeography AS g
+        ON i.CountryCodeId == g.GeographyKey
 
-OUTPUT installsByProductMarket TO SSTREAM @"/users/vijeetthomas/Installs/InstallData.ss";
+    WHERE !string.IsNullOrEmpty(i.ProductId)
+    AND i.LastKnownInstallState == 3
+    //AND i.InstallInitiator == "Microsoft.WindowsStore_8wekyb3d8bbwe"
+    AND i.IsInteractive == "1"
+;
+
+InstallsCount =
+    SELECT
+          Convert.ToInt32(@endDateId) AS DateId
+          , ProductId 
+          , Market
+          , COUNT(DISTINCT DeviceId) AS Installs
+    FROM SuccessfulAppInstalls_Input
+    WHERE Format.IsValidOSReleaseExcludingPrerelease(OSRelease)
+    GROUP BY DateId, ProductId, Market
+   ;
+
+[Privacy.Asset.NonPersonal]
+OUTPUT InstallsCount
+TO SSTREAM @outputStream_Installs
+   CLUSTERED BY ProductId, Market
+       SORTED BY ProductId, Market
+   WITH STREAMEXPIRY @streamExpiryString;

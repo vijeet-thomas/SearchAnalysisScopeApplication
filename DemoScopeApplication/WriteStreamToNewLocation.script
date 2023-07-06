@@ -1,11 +1,12 @@
 ﻿//Script GUID:49c0d886-c774-42ce-ac82-9beeb02053f6
 //Used for tracking history
 
-#DECLARE inputStream string = @"/users/vijeetthomas/Hackathon/SearchTermProductAnalysis.ss";
-#DECLARE storageAccount string = IF("@@storageAccount@@".StartsWith("@@"), "sparkstorageaccwus2int", "@@storageAccount@@");
-#DECLARE outputStream string = @"/users/vijeetthomas/Hackathon/SearchTermProductAnalysis.csv";
+#DECLARE inputStream string = @"shares/asimov.prod.data/PublicPartner/Processed/StoreVAS/Search/RelevanceScore/exp/iteration4/2023/03/AggregatedScore_2023_03_04.ss";
+//#DECLARE storageAccount string = IF("@@storageAccount@@".StartsWith("@@"), "sparkstorageaccwus2int", "@@storageAccount@@");
+#DECLARE outputStream string = @"users/vijeetthomas/RelevanceScoreTypes.csv";
 
-input = SELECT * FROM (SSTREAM @inputStream);
+input = SELECT ProductId, Market, AggregateScore FROM (SSTREAM @inputStream) WHERE Market IN ("AU") AND ProductGroupName NOT IN ("Movies","TV Series");
 
-//OUTPUT input TO SSTREAM @outputStream WITH STREAMEXPIRY "10";
-OUTPUT input TO @outputStream USING Outputters.Csv(outputHeader : true);
+//OUTPUT input TO SSTREAM @outputStream WITH STREAMEXPIRY "30";
+OUTPUT input TO @outputStream
+    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);;

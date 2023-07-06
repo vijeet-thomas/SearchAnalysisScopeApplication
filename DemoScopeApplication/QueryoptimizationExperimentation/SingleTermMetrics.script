@@ -1,0 +1,170 @@
+﻿//Script GUID:df051b51-590c-4b84-b8af-c4ff1db9e150
+//Used for tracking history
+//Script GUID:50115a06-220a-4d6d-8c62-6a1a200cf574
+//Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 9), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-35);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/Search/QOptimizationMetrics/SingleVsMultiTerm";
+#DECLARE outputStreamAllConversion = string.Format("{0}/SingleTermQueryCorrectedConversion_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputStreamAllConversionCsv = string.Format("{0}/SingleTermQueryCorrectedConversion_{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+
+inputData =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    )
+;
+
+BaseDataDailyQ0 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName NOT LIKE "%SFA-EXP-d161b448ec%" 
+          AND Country IN ("FR","DE","MX","ES","BR")
+          AND NumberOfTerms.getNumberOfTerms(SearchTerm) == 1
+          ;
+
+ZeroSearchesOld = SELECT * FROM BaseDataDailyQ0 WHERE ContentSource == "ZeroResult";
+ZeroSearchesOld =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS ZeroSearchesOldQuery
+    FROM ZeroSearchesOld;
+
+SearchesDailyOldQuery =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseDataDailyQ0;
+
+SearchClicksAndInstallsDailyOld = SELECT SearchTerm, PageImpressionGuid, ProductId, Country,
+                            Math.Min(1, COUNT(DISTINCT PageImpressionGuid) ) AS Clicks,
+                            Math.Min(1, SUM(AttemptedAcquisitionOrInstall) ) AS Installs
+                          FROM BaseDataDailyQ0
+                          WHERE IsClicked == 1;
+
+TotalClicksAndInstallsDailyOld =
+    SELECT SearchTerm,
+           Country,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstallsDailyOld;
+
+SearchesAggDailyOld = 
+    SELECT d.*,
+           (b.TotalClicks IS NULL ? 0 : b.TotalClicks) AS Clicks,
+           (b.TotalInstalls IS NULL ? 0 : b.TotalInstalls) AS Installs,
+           (c.ZeroSearchesOldQuery IS NULL ? 0 : c.ZeroSearchesOldQuery) AS ZeroSearches
+    FROM SearchesDailyOldQuery AS d
+         LEFT JOIN TotalClicksAndInstallsDailyOld AS b 
+         ON d.SearchTerm == b.SearchTerm
+         AND d.Country == b.Country
+         LEFT JOIN ZeroSearchesOld AS c
+         ON d.SearchTerm == c.SearchTerm
+         AND d.Country == c.Country
+         ;
+        
+SearchesTotalClicksInstalls =
+    SELECT DISTINCT *,
+           ZeroSearches *100.0/ TotalSearches AS ZeroSearchesPercentage,
+           Installs * 100.0 / TotalSearches AS ConversionPercentage,
+           Clicks * 100.0 / TotalSearches AS CTRPercentage
+    FROM SearchesAggDailyOld;
+
+BaseDataDailyQ1 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName LIKE "%SFA-EXP-d161b448ec%" 
+          AND Country IN ("FR","DE","MX","ES","BR")
+          AND NumberOfTerms.getNumberOfTerms(SearchTerm) == 1
+          ;
+
+ZeroSearchesNew = SELECT * FROM BaseDataDailyQ1 WHERE ContentSource == "ZeroResult";
+ZeroSearchesNew =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS ZeroSearchesNewQuery
+    FROM ZeroSearchesNew;
+
+SearchesDailyNewQuery =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseDataDailyQ1;
+
+SearchClicksAndInstallsDailyNew = SELECT SearchTerm, PageImpressionGuid, ProductId, Country,
+                            Math.Min(1, COUNT(DISTINCT PageImpressionGuid) ) AS Clicks,
+                            Math.Min(1, SUM(AttemptedAcquisitionOrInstall) ) AS Installs
+                          FROM BaseDataDailyQ1
+                          WHERE IsClicked == 1;
+
+TotalClicksAndInstallsDailyNew =
+    SELECT SearchTerm,
+           Country,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstallsDailyNew;
+
+SearchesAggDailyNew = 
+    SELECT d.*,
+           (b.TotalClicks IS NULL ? 0 : b.TotalClicks) AS Clicks,
+           (b.TotalInstalls IS NULL ? 0 : b.TotalInstalls) AS Installs,
+           (c.ZeroSearchesNewQuery IS NULL ? 0 : c.ZeroSearchesNewQuery) AS ZeroSearches
+    FROM SearchesDailyNewQuery AS d
+         LEFT JOIN TotalClicksAndInstallsDailyNew AS b 
+         ON d.SearchTerm == b.SearchTerm
+         AND d.Country == b.Country
+         LEFT JOIN ZeroSearchesNew AS c
+         ON d.SearchTerm == c.SearchTerm
+         AND d.Country == c.Country
+         ;
+        
+SearchesTotalClicksInstallsNew =
+    SELECT DISTINCT *,
+           ZeroSearches *100.0/ TotalSearches AS ZeroSearchesPercentage,
+           Installs * 100.0 / TotalSearches AS ConversionPercentage,
+           Clicks * 100.0 / TotalSearches AS CTRPercentage
+    FROM SearchesAggDailyNew;
+
+FinalSearchesData = 
+    SELECT  "SingleTermOldQuery" AS GroupName,
+            *
+       FROM SearchesTotalClicksInstalls 
+       UNION ALL
+       SELECT "SingleTermNewQuery" AS GroupName,
+              * FROM SearchesTotalClicksInstallsNew 
+;
+
+OUTPUT FinalSearchesData TO SSTREAM @outputStreamAllConversion
+;
+//CLUSTERED BY SearchTerm,Country
+//        SORTED BY TotalSearchesNewQuery DESC, ClicksNewQuery DESC, InstallsNewQuery DESC;
+
+OUTPUT FinalSearchesData
+    TO @outputStreamAllConversionCsv
+    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);
+
+#CS
+
+public static class NumberOfTerms
+{
+    public static int getNumberOfTerms (String content) {
+        return content.Split(' ').Count();
+    }
+}
+
+#ENDCS

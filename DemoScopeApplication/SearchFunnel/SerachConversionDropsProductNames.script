@@ -1,0 +1,39 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:8a45b3c1-5908-4b6b-b39a-c907c822de69
+// Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE inputComparisonStream3 string = string.Format("{0}/ConversionSearchTermProductAnalysisWW.ss", @rootFolder);
+#DECLARE outputComparisonStream3 string = string.Format("{0}/ConversionSearchTermProductAnalysisNames.ss", @rootFolder);
+
+#DECLARE outputStream string = @"/users/vijeetthomas/RelevanceScore/OtherProducts.ss";
+#DECLARE streamExpiryString string = "1";
+
+
+input =
+SELECT *
+FROM
+(
+    SSTREAM @inputComparisonStream3
+);
+
+#DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+productNames =
+SELECT *
+FROM
+(
+    SSTREAM @productNameMapper
+);
+
+output = 
+    SELECT a.*, b.ProductName
+    FROM input AS a 
+         LEFT JOIN productNames AS b
+         ON a.ProductId == b.ProductId
+    WHERE a.ProductId IS NOT NULL;
+
+
+OUTPUT output
+TO SSTREAM @outputComparisonStream3
+CLUSTERED BY SearchTerm, ProductId
+SORTED BY TotalSearchesApril DESC, AprilInstalls DESC, AprilClicks DESC;

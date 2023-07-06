@@ -1,0 +1,54 @@
+﻿//Script GUID:30848c1f-03d9-4c35-bc9b-3f3122cff6c1
+//Used for tracking history
+
+//Script GUID:50c88c2b-5ee8-4afb-b450-4a73e1cfdaa6
+//Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/SearchMetrics";
+#DECLARE outputGuardRailDaily string  = string.Format("{0}/AppVersion_UserDistribution_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+
+searchProductsDaily =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate = @startDate1DayString,
+        endDate = @endDateString
+    )
+;
+
+BaseDataDaily =
+    SELECT AppVer,
+           UserIdFull
+    FROM searchProductsDaily
+    WHERE 
+          IsTest!= 1  
+          AND AppVer LIKE "2%" 
+          ;
+
+SearchesDaily =
+    SELECT AppVer,
+           COUNT(DISTINCT UserIdFull) AS NumberOfUsers
+    FROM BaseDataDaily;
+
+TotalUsersData = 
+    SELECT SUM(NumberOfUsers) AS TotalUsers
+           FROM SearchesDaily;
+
+UsersData =
+    SELECT a.*,
+           b.TotalUsers,
+           (NumberOfUsers*100.0)/TotalUsers AS UserPercentage
+    FROM SearchesDaily AS a
+    CROSS JOIN
+        TotalUsersData AS b;
+
+OUTPUT UsersData TO SSTREAM @outputGuardRailDaily
+  CLUSTERED BY AppVer
+        SORTED BY UserPercentage DESC, NumberOfUsers DESC;
+

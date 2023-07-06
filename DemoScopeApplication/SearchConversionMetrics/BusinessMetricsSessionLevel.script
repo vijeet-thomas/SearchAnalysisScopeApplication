@@ -1,0 +1,83 @@
+﻿//Script GUID:79fc422f-819e-4f92-b697-9ede6ca8e846
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate;
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchMetrics";
+#DECLARE outputBusinessDaily string  = string.Format("{0}/BusinessMetricsDaily_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate.AddDays(-2));
+#DECLARE outputSearchesAggDaily string  = string.Format("{0}/BusinessMetricsSessionLevel/Daily/{1:yyyy}/{1:MM}/SearchesAggDaily_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate.AddDays(-2));
+
+searchProductsDaily =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs/SearchProduct/SearchProduct.view"
+    PARAMS
+    (
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    )
+;
+
+BaseDataDaily =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           DateId AS Timestamp,
+           ProductId,
+           ProductName,
+           SlotNumber,
+           IsClicked,
+           CVRoot,
+           Country AS Market,
+           IsAttemptedAcquisition
+    FROM searchProductsDaily
+    WHERE
+    //IsTest != 1
+    SearchType == "Regular" 
+    AND SearchTerm IS NOT NULL
+    AND SearchTerm.Length > 0
+    //AND SearchTerm.ToLower().Trim() == "roblox"
+    //AND CVRoot IS NOT NULL
+    //AND (SearchType == "Regular" OR SearchType == "Autosuggest")
+    //AND IsFinalSearch == true
+    //AND DeviceClass == "Windows.Desktop"
+    
+   // AND SlotNumber >= 0
+    
+;
+
+SearchesDaily =
+    SELECT //Timestamp,
+           //Market,
+           SearchTerm,
+           COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM BaseDataDaily;
+
+TotalClicksAndInstallsDaily =
+    SELECT //Timestamp, 
+           //Market,
+           SearchTerm,
+           //CVRoot,
+           SUM(IsClicked) AS TotalClicks,
+           SUM(IsAttemptedAcquisition) AS TotalInstalls
+    FROM BaseDataDaily;
+
+SearchesAggDaily = 
+    SELECT a.*,
+           b.TotalClicks,
+           b.TotalInstalls
+    FROM SearchesDaily AS a LEFT JOIN TotalClicksAndInstallsDaily AS b ON //a.Market == b.Market AND 
+                                                                          a.SearchTerm == b.SearchTerm;
+
+BusinessMetricOverviewDaily = 
+    SELECT 
+           //Timestamp, 
+           //Market,
+           SearchTerm,
+           SUM(TotalSearches) AS TotalSearches,
+           SUM(TotalClicks) AS TotalClicks,
+           SUM(TotalInstalls) AS TotalInstalls,
+           SUM(TotalInstalls) * 100.0 / SUM(TotalSearches) AS ConversionPercentage,
+           SUM(TotalClicks) * 100.0 / SUM(TotalSearches) AS CTRPercentage
+    FROM SearchesAggDaily;
+
+OUTPUT BusinessMetricOverviewDaily
+TO SSTREAM @outputBusinessDaily;

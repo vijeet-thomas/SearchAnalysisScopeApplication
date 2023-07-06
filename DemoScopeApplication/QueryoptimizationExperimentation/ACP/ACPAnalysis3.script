@@ -1,0 +1,54 @@
+﻿#DECLARE inputStream string = @"/users/vijeetthomas/search/ACPAnalysis2/SearchTermAnalysis.ss";
+#DECLARE inputStream2 string = @"/users/vijeetthomas/search/ACPAnalysis2/SearchTermToProductAnalysis.ss";
+
+input =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputStream
+    );
+
+goodTerms =
+    SELECT *
+    FROM input
+    WHERE DateId < 20220826 AND ACP < 4;
+
+badTerms =
+    SELECT *
+    FROM input
+    WHERE DateId >= 20220826 AND ACP >= 4;
+
+degradedTerms =
+    SELECT DISTINCT SearchTerm
+    FROM goodTerms
+    INNER JOIN
+        badTerms
+        ON goodTerms.SearchTerm == badTerms.SearchTerm;
+
+degradedTermsOutput =
+    SELECT input.*
+    FROM input
+    INNER JOIN
+        degradedTerms
+        ON input.SearchTerm == degradedTerms.SearchTerm;
+
+input2 =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputStream2
+    );
+
+searchTermsAndProducts =
+    SELECT DISTINCT input2.*
+    FROM input2
+    INNER JOIN
+        degradedTerms
+        ON input2.SearchTerm == degradedTerms.SearchTerm;
+
+OUTPUT degradedTermsOutput TO SSTREAM "/users/vijeetthomas/search/ACPAnalysis2/ProblematicSearchTerms.ss"
+        CLUSTERED BY DateId, Market,SearchTerm 
+        SORTED BY SearchCount DESC, ACP DESC;
+OUTPUT searchTermsAndProducts TO SSTREAM "/users/vijeetthomas/search/ACPAnalysis2/ProblematicSearchTermsAndProducts.ss"
+    CLUSTERED BY DateId, Market, SearchTerm, ProductId, ProductName
+    SORTED BY SearchCount DESC, ACP DESC;

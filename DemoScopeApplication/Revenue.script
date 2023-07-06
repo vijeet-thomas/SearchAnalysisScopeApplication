@@ -1,0 +1,99 @@
+﻿#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+
+// Date Parameters
+#DECLARE startDate DateTime = DateTime.UtcNow.AddDays(-5);
+#DECLARE endDate DateTime = DateTime.UtcNow.AddDays(-1);
+#DECLARE fileDate DateTime = DateTime.UtcNow.AddDays(0);
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+
+
+// Input
+#DECLARE sfaImpressionsRoot string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/";
+#DECLARE ImpressionStreamPattern string = @"%Y/%m/SFA_PageImpressions_%Y_%m_%d.ss";
+#DECLARE universalStoreView string = @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"; 
+
+// Output
+#DECLARE RevenueOutput string = @"users/saurabhvig/Last5Revenue.ss";
+
+universalStoreData =
+    VIEW @universalStoreView
+    PARAMS 
+    (
+        startDate = @startDateString,
+        endDate = @endDateString
+    );
+
+installSummary =
+    SELECT PageImpressionGuid,
+           ProductId,
+           ProductDisplayName,
+           Country AS Market,
+           Math.Min(1, SUM(ResultingSuccessfulAcquisitions_Free) + SUM(ResultingSuccessfulAcquisitions_Paid) + SUM(ResultingSuccessfulAcquisitions_Trial)) AS Installs
+    FROM universalStoreData
+    WHERE IsClicked == true;
+
+installCount =
+    SELECT ProductId,
+           ProductDisplayName,
+           Market,
+           SUM(Installs) AS TotalSearchInstalls
+    FROM installSummary;
+
+SFAImpressionsData_0 =
+    EXTRACT ProductId:string,
+            ProductType:string,
+            CountryCode:string,
+            ImpressionGuid: string,
+            Revenue:double
+    FROM SPARSE STREAMSET @sfaImpressionsRoot
+         PATTERN @ImpressionStreamPattern
+         RANGE __date = [@startDateString, @endDateString]
+    HAVING (ProductType IS NOT NULL) AND (ProductType == "App" OR ProductType == "Game") AND Revenue > 0
+    USING Extractors.SStream();
+
+
+SFARevenue = 
+    SELECT ProductId,
+           CountryCode,
+           COUNT(*) AS TotalInstalls,
+           SUM(Revenue) AS TotalRevenue
+    FROM SFAImpressionsData_0
+    GROUP BY ProductId,
+             CountryCode;
+
+SFARevenueWithInstallCount = 
+    SELECT SFARevenue.ProductId,
+           ProductDisplayName,
+           Market,
+           TotalRevenue,
+           TotalInstalls,
+           TotalSearchInstalls
+    FROM SFARevenue
+    INNER JOIN
+    installCount
+
+    ON
+
+    installCount.ProductId == SFARevenue.ProductId AND
+    installCount.Market == SFARevenue.CountryCode;
+
+RevenueFromSearch =
+    SELECT ProductId,
+           ProductDisplayName,
+           Market,
+           TotalInstalls,
+           TotalSearchInstalls,
+           TotalRevenue,
+           ((TotalRevenue/TotalInstalls) * TotalSearchInstalls) AS TotalSearchRevenue
+    FROM SFARevenueWithInstallCount;
+
+
+
+[Privacy.Asset.NonPersonal]
+OUTPUT RevenueFromSearch
+TO SSTREAM @RevenueOutput
+    CLUSTERED BY TotalSearchRevenue
+    SORTED BY TotalSearchRevenue DESC;

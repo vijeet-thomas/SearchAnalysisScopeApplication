@@ -1,0 +1,63 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:420a693f-8314-47e3-8666-1d10cc0d4e11
+// Used for tracking history
+
+// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:bda3793b-bc5b-4075-929f-8dc452c5574c
+// Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE firstDayMarch DateTime = new DateTime(2023, 3, 1);
+#DECLARE firstDayApril DateTime = new DateTime(2023, 4, 1);
+#DECLARE lastDayMarch DateTime = new DateTime(2023, 3, 31);
+#DECLARE lastDayApril DateTime = new DateTime(2023, 4, 30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE firstDayMarchString string = @firstDayMarch.ToString("yyyy-MM-dd");
+#DECLARE firstDayAprilString string = @firstDayApril.ToString("yyyy-MM-dd");
+#DECLARE lastDayMarchString string = @lastDayMarch.ToString("yyyy-MM-dd");
+#DECLARE lastDayAprilString string = @lastDayApril.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/Firefox";
+#DECLARE outputBaseDataMarch string  = string.Format("{0}/BaseDataMarch.ss",@rootFolder);
+#DECLARE outputBaseDataApril string  = string.Format("{0}/BaseDataApril.ss",@rootFolder);
+
+
+inputData1 =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        StartDate  = @firstDayAprilString,
+        EndDate = @lastDayAprilString
+    )
+;
+
+BaseDataDaily1 =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           DateId AS Timestamp,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           ProductTypeName,
+           CVRoot,
+           FlightName,
+          // UserIdFull,
+           ContentSource,
+           PageImpressionGuid,
+           DeviceIdFull,
+           SearchType,
+           Country AS Market,
+           AttemptedAcquisitionOrInstall IS NULL? 0 : AttemptedAcquisitionOrInstall AS AttemptedAcquisitionOrInstall
+    FROM inputData1
+    WHERE
+    //IsTest != 1 AND 
+    (SearchType == "Regular" OR SearchType == "Autosuggest")
+    AND IsFinalSearch == true
+    AND DeviceClass == "Windows.Desktop"
+    AND SearchTerm.Length > 0
+    AND SlotNumber >= 0
+    AND (SearchTerm.ToLower().Trim() == "firefox" || SearchTerm.ToLower().Trim() == "whatsapp")
+   // AND ContentSource == "ZeroResult"
+;
+
+OUTPUT BaseDataDaily1 TO SSTREAM @outputBaseDataApril;

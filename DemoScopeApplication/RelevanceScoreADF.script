@@ -1,0 +1,112 @@
+﻿//Script GUID:10adcda9-7a2a-446d-ac56-c5d96ab2a80e
+//Used for tracking history 
+
+// This script processes the relevance score stream and stores an aggregate market JSON against each product ID.
+
+ 
+
+// Date Parameters
+#DECLARE startDate DateTime = IF("@@startDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@startDate@@"));
+//#DECLARE startDate DateTime =  IF("@@startDate@@".Equals("NA"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@startDate@@", CultureInfo.CreateSpecificCulture("en-US")));
+// --------------------------------------------------------------------------------------------------------------------
+
+ 
+
+//#DECLARE StreamSource string = IF("@@testStream@@".Equals("true"), "INT_", "");
+
+ 
+
+// Output Streams and Paths
+#DECLARE outputRoot string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/RelevanceScoreDashboard/Data/";
+#DECLARE Out_RelevanceJsonByProductIdSS string = string.Format("{0}/{1:yyyy}/{1:MM}/RelevanceJsonByProductIdSS_{1:yyyy}_{1:MM}_{1:dd}.ss", @outputRoot.TrimEnd(new[]{ '/' }), @startDate);
+#DECLARE streamExpiryString string = "30";
+// --------------------------------------------------------------------------------------------------------------------
+
+ 
+
+// Input Streams and Views
+#DECLARE inputRoot string = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/";
+#DECLARE In_AggregateScore string = IF("@@inputStream@@".StartsWith("@@"),string.Format("{0}/{1:yyyy}/{1:MM}/AggregatedScore_{1:yyyy}_{1:MM}_{1:dd}.ss", @inputRoot.TrimEnd(new[]{ '/' }), @startDate),"@@inputStream@@");
+#DECLARE ProductNameMapping string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+
+ 
+
+
+ProductMapping =
+    SELECT ProductId,
+           ProductName
+    FROM
+    (
+        SSTREAM @ProductNameMapping
+    );
+
+ 
+
+aggregateScore = 
+    SELECT *
+    FROM 
+    (
+        SSTREAM @In_AggregateScore
+    )
+    WHERE !string.IsNullOrEmpty(ProductId);
+
+ 
+
+ProductIdMarketJson =
+    SELECT ProductId,
+           ANY_VALUE(ProductGroupName) AS ProductGroupName,
+           ANY_VALUE(ProductTypeName) AS ProductTypeName,
+           //ARRAY_AGG(string.Format("{{ \"market\": \"{0}\", \"pdpViewCount\": {1}, \"pdpViewsNormalized\": {2}, \"avgPdpNormalized\": {3}, \"installCount\": {4}, \"installNormalized\": {5}, \"avgInstallNormalized\": {6}, \"RatingCountCleaned\": {7}, \"ScoreQuality\": {8}, \"ScoreQualityNormalized\": {9}, \"AvgScoreQualityNormalized\": {10}, \"ScorePopularity\": {11}, \"ScorePopularityNormalized\": {12}, \"AvgScorePopularityNormalized\": {13}, \"RatingCountCleanedAG\": {14},\"ScoreQualityAG\": {15},\"ScoreQualityAGNormalized\": {16},\"AvgScoreQualityAGNormalized\": {17},\"ScorePopularityAG\": {18},\"ScorePopularityAGNormalized\": {19},\"AvgScorePopularityAGNormalized\": {20}, \"Win32InstallsWeb\": {21}, \"Win32InstallsWebNormalized\": {22}, \"AvgWin32InstallsWebNormalized\": {23},  \"Win32InstallsStore\": {24}, \"Win32InstallsStoreNormalized\": {25}, \"AvgWin32InstallsStoreNormalized\":{26}, \"MadCount\": {27}, \"MadCountNormalized\": {28}, \"AvgMadCount\": {29}, \"score\":{30} }}",
+           //ARRAY_AGG(string.Format("{{ \"market\": \"{0}\", \"pdpViewCount\": {1}, \"pdpViewsNormalized\": {2}, \"avgPdpNormalized\": {3}, \"installCount\": {4}, \"installNormalized\": {5}, \"avgInstallNormalized\": {6}, \"RatingCountCleaned\": {7}, \"ScoreQuality\": {8}, \"ScoreQualityNormalized\": {9}, \"AvgScoreQualityNormalized\": {10}, \"ScorePopularity\": {11}, \"ScorePopularityNormalized\": {12}, \"AvgScorePopularityNormalized\": {13}, \"RatingCountCleanedAG\": {14},\"ScoreQualityAG\": {15},\"ScoreQualityAGNormalized\": {16},\"AvgScoreQualityAGNormalized\": {17},\"ScorePopularityAG\": {18},\"ScorePopularityAGNormalized\": {19},\"AvgScorePopularityAGNormalized\": {20}, \"Win32InstallsWeb\": {21}, \"Win32InstallsWebNormalized\": {22}, \"AvgWin32InstallsWebNormalized\": {23},  \"Win32InstallsStore\": {24}, \"Win32InstallsStoreNormalized\": {25}, \"AvgWin32InstallsStoreNormalized\":{26}, \"score\":{27} }}",           
+           ARRAY_AGG(string.Format("{{ \"market\": \"{0}\", \"pdpViewCount\": {1},  \"installCount\": {2}, \"RatingCountCleaned\": {3}, \"ScoreQuality\": {4},  \"ScorePopularity\": {5},  \"RatingCountCleanedAG\": {6}, \"GoodRatingPercentageAG\": {7}, \"FraudPercentageAG\": {8}, \"ScoreQualityAG\": {9}, \"ScorePopularityAG\": {10}, \"Win32InstallsWeb\": {11}, \"Win32InstallsStore\": {12}, \"MadCount\" : {13}, \"score\":{14} }}",           
+               Market,
+               PdpViewCount IS NULL ? 0 : PdpViewCount,
+
+               InstallsCount IS NULL ? 0 : InstallsCount,
+
+               RatingCountCleaned IS NULL ? 0 : RatingCountCleaned,
+
+               ScoreQuality IS NULL ? 0 : ScoreQuality,
+           
+               ScorePopularity IS NULL ? 0 : ScorePopularity,
+               
+               RatingCountCleanedAG IS NULL ? 0 : RatingCountCleanedAG,
+               GoodRatingPercentageAG IS NULL ? 0 : GoodRatingPercentageAG,
+               FraudPercentageAG IS NULL ? 0 : FraudPercentageAG,
+               
+               ScoreQualityAG IS NULL ? 0 : ScoreQualityAG,
+           
+               ScorePopularityAG IS NULL ? 0 : ScorePopularityAG,
+           
+               Win32InstallCountWeb IS NULL ? 0 : Win32InstallCountWeb,
+           
+               Win32InstallCountStore IS NULL ? 0 : Win32InstallCountStore,
+           
+               MadCountCleaned IS NULL ? 0 : MadCountCleaned,
+
+               AggregateScore IS NULL ? 0 : AggregateScore
+               )) AS MarketScoreArray
+
+    FROM aggregateScore
+    GROUP BY ProductId;
+
+ 
+
+aggJsonByProductId =
+    SELECT ROW_NUMBER() OVER(ORDER BY ProductId) AS RowNum,
+           ProductId,
+           ProductName,
+           ProductGroupName,
+           ProductTypeName,
+           @startDate AS Timestamp,
+           "["+string.Format("{0}", string.Join(",", MarketScoreArray))+"]" AS MarketScoreJson
+    FROM ProductIdMarketJson LEFT JOIN ProductMapping AS p
+    ON ProductId == p.ProductId;
+
+ 
+
+OUTPUT aggJsonByProductId
+TO SSTREAM @Out_RelevanceJsonByProductIdSS
+   CLUSTERED BY ProductId
+   SORTED BY ProductId
+   WITH STREAMEXPIRY @streamExpiryString;

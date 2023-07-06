@@ -1,0 +1,203 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:bda3793b-bc5b-4075-929f-8dc452c5574c
+// Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE firstDayMarch DateTime = new DateTime(2023, 3, 1);
+#DECLARE firstDayApril DateTime = new DateTime(2023, 4, 1);
+#DECLARE lastDayMarch DateTime = new DateTime(2023, 3, 31);
+#DECLARE lastDayApril DateTime = new DateTime(2023, 4, 30);
+#DECLARE firstDayFeb DateTime = new DateTime(2023, 2, 1);
+#DECLARE lastDayFeb DateTime = new DateTime(2023, 2, 28);
+#DECLARE firstDayJan DateTime = new DateTime(2023, 1, 1);
+#DECLARE lastDayJan DateTime = new DateTime(2023, 1, 31);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE firstDayMarchString string = @firstDayMarch.ToString("yyyy-MM-dd");
+#DECLARE firstDayAprilString string = @firstDayApril.ToString("yyyy-MM-dd");
+#DECLARE lastDayMarchString string = @lastDayMarch.ToString("yyyy-MM-dd");
+#DECLARE lastDayAprilString string = @lastDayApril.ToString("yyyy-MM-dd");
+#DECLARE firstDayFebString string = @firstDayFeb.ToString("yyyy-MM-dd");
+#DECLARE lastDayFebString string = @lastDayFeb.ToString("yyyy-MM-dd");
+#DECLARE firstDayJanString string = @firstDayJan.ToString("yyyy-MM-dd");
+#DECLARE lastDayJanString string = @lastDayJan.ToString("yyyy-MM-dd");
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE outputBaseDataMarch string  = string.Format("{0}/BaseDataMarch.ss",@rootFolder);
+#DECLARE outputBaseDataApril string  = string.Format("{0}/BaseDataApril.ss",@rootFolder);
+#DECLARE outputBaseDataFeb string  = string.Format("{0}/BaseDataFeb.ss",@rootFolder);
+#DECLARE outputBaseDataJan string  = string.Format("{0}/BaseDataJan.ss",@rootFolder);
+
+//inputData =
+//    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+//    PARAMS
+//    (
+//        startDate  = @firstDayMarchString,
+//        endDate = @lastDayMarchString
+//    )
+//;
+//
+//
+//BaseDataDaily =
+//    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+//           DateId AS Timestamp,
+//           ProductId,
+//           ProductDisplayName,
+//           ProductTypeName,
+//           SlotNumber,
+//           IsClicked,
+//           CVFull.Split('.')[0] AS CVRoot,
+//           UserIdFull,
+//           //FlightName,
+//           ContentSource,
+//           PageImpressionGuid,
+//           DeviceIdFull,
+//           SearchType,
+//           Country AS Market,
+//           //AttemptedAcquisitionOrInstall IS NULL? 0 : AttemptedAcquisitionOrInstall AS AttemptedAcquisitionOrInstall
+//           AttemptedInstalls IS NULL? 0 : AttemptedInstalls AS AttemptedInstalls,
+//           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+//           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+//           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial
+//    FROM inputData
+//    WHERE
+//    IsTest != 1 AND 
+//    (SearchType == "Regular" OR SearchType == "Autosuggest")
+//    AND IsFinalSearch == true
+//    AND DeviceClass == "Windows.Desktop"
+//    AND SearchTerm.Length > 0
+//    AND SlotNumber >= 0
+//   // AND ContentSource == "ZeroResult"
+//;
+//
+//inputData2 =
+//    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+//    PARAMS
+//    (
+//        startDate  = @firstDayAprilString,
+//        endDate = @lastDayAprilString
+//    )
+//;
+//
+//BaseDataDaily2 =
+//    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+//           DateId AS Timestamp,
+//           ProductId,
+//           ProductDisplayName,
+//           SlotNumber,
+//           IsClicked,
+//           ProductTypeName,
+//           CVFull.Split('.')[0] AS CVRoot,
+//           //FlightName,
+//           UserIdFull,
+//           ContentSource,
+//           PageImpressionGuid,
+//           DeviceIdFull,
+//           SearchType,
+//           Country AS Market,
+//           //AttemptedAcquisitionOrInstall IS NULL? 0 : AttemptedAcquisitionOrInstall AS AttemptedAcquisitionOrInstall
+//           AttemptedInstalls IS NULL? 0 : AttemptedInstalls AS AttemptedInstalls,
+//           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+//           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+//           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial
+//    FROM inputData2
+//    WHERE
+//    IsTest != 1 AND 
+//    (SearchType == "Regular" OR SearchType == "Autosuggest")
+//    AND IsFinalSearch == true
+//    AND DeviceClass == "Windows.Desktop"
+//    AND SearchTerm.Length > 0
+//    AND SlotNumber >= 0
+//   // AND ContentSource == "ZeroResult"
+//;
+//
+//OUTPUT BaseDataDaily TO SSTREAM @outputBaseDataMarch;
+//
+//OUTPUT BaseDataDaily2 TO SSTREAM @outputBaseDataApril;
+
+inputData =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate  = @firstDayJanString,
+        endDate = @lastDayJanString
+    )
+;
+
+BaseDataDaily =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           DateId AS Timestamp,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           ProductTypeName,
+           CVFull.Split('.')[0] AS CVRoot,
+           //FlightName,
+           UserIdFull,
+           ContentSource,
+           PageImpressionGuid,
+           DeviceIdFull,
+           SearchType,
+           Country AS Market,
+           //AttemptedAcquisitionOrInstall IS NULL? 0 : AttemptedAcquisitionOrInstall AS AttemptedAcquisitionOrInstall
+           AttemptedInstalls IS NULL? 0 : AttemptedInstalls AS AttemptedInstalls,
+           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial
+    FROM inputData
+    WHERE
+    IsTest != 1 AND 
+    (SearchType == "Regular" OR SearchType == "Autosuggest")
+    AND IsFinalSearch == true
+    AND DeviceClass == "Windows.Desktop"
+    AND SearchTerm.Length > 0
+    AND SlotNumber >= 0
+   // AND ContentSource == "ZeroResult"
+;
+
+OUTPUT BaseDataDaily TO SSTREAM @outputBaseDataJan;
+
+
+inputData2 =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate  = @firstDayFebString,
+        endDate = @lastDayFebString
+    )
+;
+
+BaseDataDaily2 =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           DateId AS Timestamp,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           ProductTypeName,
+           CVFull.Split('.')[0] AS CVRoot,
+           //FlightName,
+           UserIdFull,
+           ContentSource,
+           PageImpressionGuid,
+           DeviceIdFull,
+           SearchType,
+           Country AS Market,
+           //AttemptedAcquisitionOrInstall IS NULL? 0 : AttemptedAcquisitionOrInstall AS AttemptedAcquisitionOrInstall
+           AttemptedInstalls IS NULL? 0 : AttemptedInstalls AS AttemptedInstalls,
+           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial
+    FROM inputData2
+    WHERE
+    IsTest != 1 AND 
+    (SearchType == "Regular" OR SearchType == "Autosuggest")
+    AND IsFinalSearch == true
+    AND DeviceClass == "Windows.Desktop"
+    AND SearchTerm.Length > 0
+    AND SlotNumber >= 0
+   // AND ContentSource == "ZeroResult"
+;
+
+OUTPUT BaseDataDaily2 TO SSTREAM @outputBaseDataFeb;
+
+

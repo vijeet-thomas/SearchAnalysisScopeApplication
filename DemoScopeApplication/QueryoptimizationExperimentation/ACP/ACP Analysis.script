@@ -1,0 +1,112 @@
+﻿ //Script GUID:1cd993da-6630-4223-a726-905583eafa8e
+//Used for tracking history
+
+// --------------------------------------------------------------------------------------------------------------------
+// Modules & References
+// --------------------------------------------------------------------------------------------------------------------
+// NGP Tagging Module
+#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Census/Microsoft.Telemetry.Device.Census.dll";
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Common/Microsoft.Telemetry.Common.Utilities.dll";
+
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module";
+
+//----------------------------------------------------------------------------------------------------------------------------------------------------
+
+#IF("@@numberOfDays@@".StartsWith("@@"))
+    #DECLARE numberOfDays int = 28;
+#ELSE
+#DECLARE numberOfDays int = Int32.Parse("@@numberOfDays@@");
+#ENDIF
+
+// Date Parameters
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 2), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate DateTime = @endDate.AddDays(1 - @numberOfDays);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+#DECLARE startDateId string = @startDate.ToString("yyyyMMdd");
+#DECLARE endDateId string = @endDate.ToString("yyyyMMdd");
+
+// Input Streams and Views
+#DECLARE inputRoot string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/KPIs/Searches/HealthMetrics/AvgClickPosition/Daily";
+#DECLARE firstClickPattern string = @"/%Y/%m/SearchProductFirstClick_%Y_%m_%d.ss";
+#DECLARE inputStreamHPC string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/KPIs/Searches/HealthMetrics/AvgClickPosition/HPCSearchTermData.ss";
+
+searchProductFirstClick =
+    (
+    SSTREAM SPARSE STREAMSET @inputRoot
+                   PATTERN @firstClickPattern
+                   RANGE __date = [@startDateString, @endDateString]
+    );
+
+inputStreamHPCData =
+    SSTREAM @inputStreamHPC;
+
+searchProductFirstClickFiltered =
+    SELECT searchProductFirstClick.*
+    FROM searchProductFirstClick
+         LEFT JOIN
+             inputStreamHPCData
+         ON searchProductFirstClick.SearchTerm == inputStreamHPCData.SearchTerm
+    WHERE inputStreamHPCData.SearchTerm IS NULL;
+
+searchDataSummary =
+    SELECT SlotNumber,
+           COUNT(SearchTerm) AS CountOfSearches
+    FROM searchProductFirstClickFiltered
+    WHERE SearchType == "Regular"
+          AND SlotNumber >= 0
+          AND AppVersion.StartsWith("2")
+    GROUP BY SlotNumber
+;
+
+searchTermSummary =
+    SELECT SearchTerm,
+           SlotNumber == 0 ? 1 : 0 AS SlotNumber0,
+           SlotNumber == 1 ? 1 : 0 AS SlotNumber1,
+           SlotNumber == 2 ? 1 : 0 AS SlotNumber2,
+           SlotNumber == 3 ? 1 : 0 AS SlotNumber3,
+           SlotNumber == 4 ? 1 : 0 AS SlotNumber4,
+           SlotNumber == 5 ? 1 : 0 AS SlotNumber5,
+           SlotNumber >= 6 ? 1 : 0 AS SlotNumberOver6,
+           SlotNumber >= 0 ? 1 : 0 AS TotalSearches
+    FROM searchProductFirstClickFiltered
+;
+
+searchTermSummary =
+    SELECT SearchTerm,
+           SUM(SlotNumber0) AS SlotNumber0,
+           SUM(SlotNumber1) AS SlotNumber1,
+           SUM(SlotNumber2) AS SlotNumber2,
+           SUM(SlotNumber3) AS SlotNumber3,
+           SUM(SlotNumber4) AS SlotNumber4,
+           SUM(SlotNumber5) AS SlotNumber5,
+           SUM(SlotNumberOver6) AS SlotNumberOver6,
+           SUM(TotalSearches) AS TotalSearches
+    FROM searchTermSummary
+;
+
+searchTermSummary = 
+    SELECT *,
+           ((double) SlotNumber0/TotalSearches) AS SlotNumber0Percentage,
+           ((double) SlotNumber1/TotalSearches) AS SlotNumber1Percentage,
+           ((double) SlotNumber2/TotalSearches) AS SlotNumber2Percentage,
+           ((double) SlotNumber3/TotalSearches) AS SlotNumber3Percentage,
+           ((double) SlotNumber4/TotalSearches) AS SlotNumber4Percentage,
+           ((double) SlotNumber5/TotalSearches) AS SlotNumber5Percentage,
+           ((double) SlotNumberOver6/TotalSearches) AS SlotNumberOver6Percentage
+     FROM searchTermSummary;      
+           
+OUTPUT searchDataSummary
+TO SSTREAM "/users/vijeetthomas/search/ACPAnalysis/SearchDistribution.ss"
+    CLUSTERED BY SlotNumber
+    SORTED BY CountOfSearches DESC
+   WITH STREAMEXPIRY "30";
+
+OUTPUT searchTermSummary
+TO SSTREAM "/users/vijeetthomas/search/ACPAnalysis/SearchTermDistribution.ss"
+    CLUSTERED BY SearchTerm
+    SORTED BY TotalSearches DESC
+   WITH STREAMEXPIRY "30";

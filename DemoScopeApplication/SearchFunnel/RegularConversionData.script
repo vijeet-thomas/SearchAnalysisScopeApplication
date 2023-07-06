@@ -1,0 +1,206 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:e75d0a08-4b5c-4e66-ae63-80e1d4c7debb
+// Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+//#DECLARE rootFolder string = @"/users/vijeetthomas/SearchFunnel/";
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE inputBaseDataMarch string  = string.Format("{0}/BaseDataMarch.ss",@rootFolder,@endDate);
+#DECLARE inputBaseDataApril string  = string.Format("{0}/BaseDataApril.ss",@rootFolder,@endDate);
+//#DECLARE outputBusinessDaily string  = string.Format("{0}/AdobeMimick/ConversionData_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+//#DECLARE outputBusinessDailyUS string  = string.Format("{0}/AdobeMimick/ConversionDataUS_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+//#DECLARE outputZeroCTR string  = string.Format("{0}/AdobeMimick/ZeroCTRSearches_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+//#DECLARE outputZeroCTRUS string  = string.Format("{0}/AdobeMimick/ZeroCTRSearchesUS_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputComparisonStream string = string.Format("{0}/RegularConversionSearchTermAnalysisWW.ss", @rootFolder);
+
+BaseDataMarch =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataMarch
+    )
+    WHERE SearchType == "Regular";
+
+SearchesMarch =
+    SELECT //Market,
+           SearchTerm,
+           COUNT(DISTINCT CVRoot) AS TotalSearchesMarch
+    FROM BaseDataMarch;
+
+SearchClicksAndInstallsMarch = SELECT //Market, 
+                                      SearchTerm, 
+                                      CVRoot,
+                            Math.Min(1,COUNT(*)) AS Clicks,
+                            //COUNT (DISTINCT CVRoot) AS Clicks,
+                            //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            //SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls) AS Installs
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                          FROM BaseDataMarch
+                          //WHERE IsClicked == 1;
+                               WHERE IsClicked == true;
+
+TotalCLicksAndInstallsMarch = 
+ SELECT //Market,
+        SearchTerm,
+        SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+        FROM SearchClicksAndInstallsMarch;
+
+MarchData =
+    SELECT a.*,
+           b.Clicks AS MarchClicks,
+           b.Installs AS MarchInstalls,
+           (b.Clicks * 100.0 / a.TotalSearchesMarch) AS CTRPercentageMarch,
+           (b.Installs * 100.0 / a.TotalSearchesMarch) AS ConversionPercentageMarch
+    FROM SearchesMarch AS a
+    //CROSS JOIN
+        INNER JOIN
+        TotalCLicksAndInstallsMarch AS b
+                                             ON //a.Market == b.Market AND 
+                                                a.SearchTerm == b.SearchTerm
+                                       ;
+
+BaseDataApril =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataApril
+    )
+    WHERE SearchType == "Regular";
+
+SearchesApril =
+    SELECT //Market,
+           SearchTerm,
+           COUNT(DISTINCT CVRoot) AS TotalSearchesApril
+    FROM BaseDataApril;
+
+SearchClicksAndInstallsApril = SELECT //Market, 
+                                        SearchTerm, 
+                                      CVRoot,
+                            Math.Min(1,COUNT(*)) AS Clicks,
+                           // COUNT (DISTINCT CVRoot) AS Clicks,
+                            //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            //SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls) AS Installs
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                          FROM BaseDataApril
+                          //WHERE IsClicked == 1;
+                               WHERE IsClicked == true;
+
+TotalCLicksAndInstallsApril = 
+ SELECT //Market,
+        SearchTerm,
+        SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+        FROM SearchClicksAndInstallsApril;
+
+AprilData =
+    SELECT a.*,
+           b.Clicks AS AprilClicks,
+           b.Installs AS AprilInstalls,
+           (b.Clicks * 100.0 / a.TotalSearchesApril) AS CTRPercentageApril,
+           (b.Installs * 100.0 / a.TotalSearchesApril) AS ConversionPercentageApril
+    FROM SearchesApril AS a
+    //CROSS JOIN
+        INNER JOIN
+        TotalCLicksAndInstallsApril AS b
+                                               ON //a.Market == b.Market AND 
+                                                 a.SearchTerm == b.SearchTerm;
+                                       ;
+
+//ComparisonStream =
+//    SELECT *
+//    FROM MarchData
+//    CROSS JOIN
+//AprilData;
+
+ComparisonStream =
+    SELECT a.*,
+           b.*.Except( SearchTerm),
+           (b.ConversionPercentageApril - a.ConversionPercentageMarch) AS ConversionDiff
+    FROM MarchData AS a
+    INNER JOIN AprilData AS b ON //a.Market == b.Market AND 
+                                 a.SearchTerm == b.SearchTerm
+                              WHERE b.TotalSearchesApril >= 100
+                              ;
+
+
+
+OUTPUT ComparisonStream TO SSTREAM @outputComparisonStream
+//CLUSTERED BY SearchTerm
+//SORTED BY TotalSearchesApril DESC, AprilInstalls DESC, AprilClicks DESC
+;
+
+//ComparisonStreamUS =
+//    SELECT *
+//    FROM ComparisonStream
+//    WHERE Market == "US";
+//
+//OUTPUT ComparisonStreamUS TO SSTREAM @outputComparisonStream2US
+//CLUSTERED BY Market, SearchTerm
+//SORTED BY TotalSearchesApril DESC, AprilInstalls DESC, AprilClicks DESC;
+
+//TotalClicksAndInstallsDaily =
+//    SELECT 
+//           SearchTerm,
+//           Market,
+//           SUM(Clicks) AS TotalClicks,
+//           SUM(Installs) AS TotalInstalls
+//    FROM SearchClicksAndInstallsDaily;
+//
+//SearchesAggDaily = 
+//    SELECT a.*,
+//           b.TotalClicks IS NULL ? 0 : b.TotalClicks AS TotalClicks,
+//           b.TotalInstalls IS NULL ? 0 : b.TotalInstalls AS TotalInstalls
+//    FROM SearchesDaily AS a 
+//         LEFT JOIN
+//         //CROSS JOIN
+//             TotalClicksAndInstallsDaily AS b 
+//         ON a.SearchTerm == b.SearchTerm AND 
+//             a.Market == b.Market;
+//;
+//
+//SearchesAggDaily =
+//    SELECT *,
+//           (TotalSearches - TotalClicks) AS ZeroClickedSearches
+//    FROM SearchesAggDaily;
+//
+//BusinessMetricOverviewDaily = 
+//    SELECT 
+//           SUM(TotalSearches) AS TotalSearches,
+//           SUM(TotalClicks) AS TotalClicks,
+//           SUM(TotalInstalls) AS TotalInstalls,
+//           SUM(ZeroClickedSearches) AS ZeroClickedSearches,
+//           SUM(TotalInstalls) * 100.0 / SUM(TotalSearches) AS ConversionPercentage,
+//           SUM(TotalClicks) * 100.0 / SUM(TotalSearches) AS CTRPercentage,
+//           SUM(ZeroClickedSearches) * 100.0 / SUM(TotalSearches) AS ZeroClickedSearchesPercentage
+//    FROM SearchesAggDaily;
+//
+//BusinessMetricOverviewDailyUS = 
+//    SELECT 
+//           SUM(TotalSearches) AS TotalSearches,
+//           SUM(TotalClicks) AS TotalClicks,
+//           SUM(TotalInstalls) AS TotalInstalls,
+//           SUM(ZeroClickedSearches) AS ZeroClickedSearches,
+//           SUM(TotalInstalls) * 100.0 / SUM(TotalSearches) AS ConversionPercentage,
+//           SUM(TotalClicks) * 100.0 / SUM(TotalSearches) AS CTRPercentage,
+//           SUM(ZeroClickedSearches) * 100.0 / SUM(TotalSearches) AS ZeroClickedSearchesPercentage
+//    FROM SearchesAggDaily
+//    WHERE Market == "US";
+//
+//OUTPUT BusinessMetricOverviewDaily
+//TO SSTREAM @outputBusinessDaily;
+//
+//OUTPUT BusinessMetricOverviewDailyUS
+//TO SSTREAM @outputBusinessDailyUS;
+//
+//OUTPUT ZeroCTRWorldWideSearches
+//TO SSTREAM @outputZeroCTR
+//CLUSTERED BY SearchTerm
+//SORTED BY ZeroSearches DESC;
+//
+//OUTPUT ZeroCTRUSSearches
+//TO SSTREAM @outputZeroCTRUS
+//CLUSTERED BY SearchTerm
+//SORTED BY ZeroSearches DESC;

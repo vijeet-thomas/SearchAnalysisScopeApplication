@@ -1,0 +1,115 @@
+//Script GUID:430d04b7-7274-40d0-a3a6-cbf90df9fb33
+//Used for tracking history
+
+//Script GUID:5026cdf9-88f6-4f22-8cda-05d015d74159
+//Used for tracking history
+
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// Required references
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Common/Microsoft.Telemetry.Common.Utilities.dll";
+REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/Device/Census/Microsoft.Telemetry.Device.Census.dll";
+
+// Reference the namespaces
+USING Microsoft.Telemetry.Device.Census;
+USING Microsoft.Telemetry.Common.Utilities;
+
+REFERENCE "/shares/asimov.prod.data/Public.Resources.Latest/OneStore/Common/Bins/Microsoft.Xbox.Cosmos.Helpers.dll";
+REFERENCE "/shares/asimov.prod.data/Public.Resources.Latest/OneStore/Common/Bins/Microsoft.OSG.OneStore.DnA.Cosmos.DynamicViewResolver.dll";
+[PIN]REFERENCE @"/shares/asimov.prod.data/Public/Resources/Latest/SchemaAdjuster/Microsoft.Telemetry.Common.SchemaAdjuster.dll";
+MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module";
+// required by DimGeography
+MODULE "/shares/asimov.prod.data/Public/Resources/Latest/Dimensions/CommonDimensions.module" AS CommonDimensions;
+USING Microsoft.Xbox.Cosmos.Helpers;
+USING Microsoft.Xbox.Cosmos.Helpers.UserDefinedFunction;
+ 
+[PIN]RESOURCE @"/shares/asimov.prod.data/Purchase.Processed.OneStore/MsOrder/Views/MsPlacedOrder.view";
+
+MODULE @"/shares/asimov.prod.data/Purchase.Processed.OneStore/Order/ConsumerPurchase/AppAndGame/AppAndGame.module" AS AppAndGameModule;
+#DECLARE PrivacyAnnotationPath string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/NGP/Resources/PrivacyAnnotation/PrivacyAnnotation.module";
+MODULE @PrivacyAnnotationPath;
+
+
+//#DECLARE endDate DateTime = IF("@@dateOffset@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 2), DateTime.UtcNow.AddDays(@@dateOffset@@));
+#DECLARE endDate DateTime = new DateTime(2023, 12, 31);
+//#DECLARE mediaType string = IF("@@mediaType@@".StartsWith("@@"), "", "@@mediaType@@");
+//#DECLARE expiryTime string = IF("@@expiryTime@@".StartsWith("@@"), "30", "@@expiryTime@@");
+//#DECLARE normalizationFactor string = IF("@@normalizationFactor@@".StartsWith("@@"), "1", "@@normalizationFactor@@");
+//#DECLARE inputEnv string = IF("@@env@@".StartsWith("@@"), "PROD", "@@env@@");
+//#DECLARE env string = IF(@inputEnv == "PROD", "", @inputEnv + "/");
+//#DECLARE @trackerVar string = "";
+
+// Input 
+//#DECLARE fullCatalog string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/{1}v2/{0}/FullCatalog.ss", @mediaType, @env);
+//#DECLARE deviceCensusConsolidatedStream string = "/shares/asimov.prod.data/Public/Processed/Device/Census/Consolidated/DeviceCensusConsolidated.View";
+#DECLARE dimGeographyView string = "/shares/asimov.prod.data/Public/Processed/Common/Dimensions/DimGeography/DimGeography.view";
+
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// Output
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+//#DECLARE output_Interactions string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/{2}v2/{1}/{0:yyyy/MM}/Interactions/Purchases/Interactions_{0:yyyy_MM_dd}.ss", @endDate, @mediaType, @env);
+//#DECLARE output_Interactions_Csv string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/{2}v2/{1}/CSV/Interactions/Purchases/Interactions_{0:yyyy_MM_dd}.csv", @endDate, @mediaType, @env);
+//#DECLARE trackerFile string  = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/{1}v2/{2}/tracker/02_Reco_Interactions_Purchase_{2}/v1/02_Reco_Interactions_Purchase_{2}_{0:yyyy_MM_dd}.txt", @endDate, @env, @mediaType);
+
+#DECLARE outputRoot string = @"users/saurabhvig/Inapp_Aug22_Sept22_Revenue_1.ss";
+#DECLARE outputAllRatings1 string = string.Format("{0}/{1:yyyy}/{1:MM}/InAppsPurchaseQ4of2022.ss", @outputRoot.TrimEnd(new[]{ '/' }), @endDate);
+
+// Fetch Data from AppandGame Module
+AppAndgame =
+    SELECT 
+           p.ParentProductId,
+           p.ProductId,
+           p.ProductTypeName,
+           p.PurchasePriceUSDAmount,
+           g.ISO2CharCountryCode.ToLowerInvariant() AS Market
+    FROM AppAndGameModule.AppAndGamePurchaseDaily
+         (
+             version = 4,
+             startDate = DateTime.Parse("2023-04-29"),
+             endDate = DateTime.Parse("2023-04-30"),
+             dataRootFolderOverRide = "/shares/asimov.prod.data",
+             purchaseToOneStorePath = "/Purchase.Processed.OneStore",
+             publicToDimensionsPath = "/Public.Processed.Common.Dimensions/OneStoreCatalog",  
+             publicToCommonPath = "/Public.Processed.Common",
+             includeNRTData = false,
+             useMaterializedStreams = false
+         ) AS p
+    INNER JOIN
+    (
+    VIEW @dimGeographyView
+    PARAMS
+    (
+        version = "V3"
+    )
+          ) AS g
+    ON p.OrderMarketId == g.GeographyKey;
+
+inapppurchasedata = SELECT * FROM AppAndgame 
+    WHERE ProductTypeName.ToLowerInvariant() == "add-on"
+                                  AND PurchasePriceUSDAmount > 0;
+
+//ProductPublisherStream = SSTREAM @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSparkProduct.ss";
+ProductPublisherStream = SSTREAM @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+
+dimsfaprod =
+    SELECT DISTINCT ProductId
+    FROM ProductPublisherStream
+    WHERE (ProductKind=="app" OR ProductKind=="game");
+
+inapppurchasejoin = SELECT A.ParentProductId, A.ProductTypeName, A.PurchasePriceUSDAmount, A.Market
+                    FROM inapppurchasedata AS A
+                    INNER JOIN
+             dimsfaprod AS B
+         ON A.ParentProductId == B.ProductId;// OR A.ProductId == B.ProductId; 
+
+inapppurchasegroup = SELECT ParentProductId, ProductTypeName, Market, SUM(PurchasePriceUSDAmount) AS SUMInAppsRev
+                      FROM inapppurchasejoin
+                      GROUP BY ParentProductId, ProductTypeName, Market;
+
+#DECLARE streamExpiryString string = "60";
+
+OUTPUT inapppurchasegroup
+TO SSTREAM @outputAllRatings1
+WITH STREAMEXPIRY @streamExpiryString;
+//USING DefaultTextOutputter(delimiter: ',', outputHeader: false);
+

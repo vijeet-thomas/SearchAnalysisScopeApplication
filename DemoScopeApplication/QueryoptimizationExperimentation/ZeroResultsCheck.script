@@ -1,0 +1,214 @@
+﻿//Script GUID:2a3ffc4c-a654-47f3-bc4d-df9442b54ca2
+//Used for tracking history
+//Script GUID:50c88c2b-5ee8-4afb-b450-4a73e1cfdaa6
+//Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-29);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/Search/QOptimizationMetrics";
+#DECLARE outputZeroResultsQ0string  = string.Format("{0}/Q0_FlightEnabled_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputZeroResultsQ1string  = string.Format("{0}/Q1_OnlyFlightEnabled_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputZeroResultsQ2string  = string.Format("{0}/Q2_FlightDisabled_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputZeroResultsQ3string  = string.Format("{0}/Q3_Q0DiffFromQ2_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputZeroResultsQ4string  = string.Format("{0}/Q4_Q1DiffFromQ2_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputZeroResultsQ5string  = string.Format("{0}/ZeroResultsConversion_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputZeroResultsQ5stringcsv  = string.Format("{0}/ZeroResultsConversion_{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+//#DECLARE inputStreamExperimentation = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/2022/11/ExperimentationSearchProduct_{1:yyyy}_{1:MM}_{1:dd}.ss",@endDate);
+
+inputData =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    )
+;
+
+BaseDataDailyQ0 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName LIKE "%SFA-EXP-d161b448ec%" 
+          AND ContentSource == "ZeroResult"
+          AND Country IN ("FR","DE","MX","ES","BR")
+          ;
+
+BaseDataDailyQ1 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")  
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName LIKE "%SFA-EXP-d161b448ec%"
+          AND FlightName NOT LIKE "%SFA-EXP%SFA-EXP-d161b448ec%SFA-EXP%"
+          AND ContentSource == "ZeroResult"
+          AND Country IN ("FR","DE","MX","ES","BR")
+;
+
+BaseDataDailyQ2 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName NOT LIKE "%SFA-EXP-d161b448ec%" 
+          AND ContentSource == "ZeroResult"
+          AND Country IN ("FR","DE","MX","ES","BR")
+          ;
+
+BaseDataDailyQ3 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName NOT LIKE "%SFA-EXP-d161b448ec%" 
+          //AND ContentSource != "ZeroResult"
+          AND Country IN ("FR","DE","MX","ES","BR")
+          ;
+
+SearchesDailyQ0 =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseDataDailyQ0;
+
+SearchesDailyQ1 =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseDataDailyQ1;
+
+SearchesDailyQ2 =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseDataDailyQ2;
+
+OUTPUT SearchesDailyQ0 TO SSTREAM @outputZeroResultsQ0string
+  CLUSTERED BY SearchTerm, Country
+        SORTED BY TotalSearches DESC;
+
+OUTPUT SearchesDailyQ1 TO SSTREAM @outputZeroResultsQ1string
+  CLUSTERED BY SearchTerm, Country
+        SORTED BY TotalSearches DESC;
+
+OUTPUT SearchesDailyQ2 TO SSTREAM @outputZeroResultsQ2string
+  CLUSTERED BY SearchTerm, Country
+        SORTED BY TotalSearches DESC;
+
+SeachesDailyQ0MinusQ2 = SELECT SearchTerm, Country FROM SearchesDailyQ0 
+                        EXCEPT ALL
+                        SELECT SearchTerm, Country FROM SearchesDailyQ2;
+
+SeachesDailyQ0MinusQ2 = SELECT a.*,b.TotalSearches 
+                        FROM SeachesDailyQ0MinusQ2 AS a 
+                             INNER JOIN SearchesDailyQ0 AS b 
+                             ON a.SearchTerm == b.SearchTerm AND a.Country == b.Country;
+
+SeachesDailyQ1MinusQ2 = SELECT SearchTerm, Country FROM SearchesDailyQ1 
+                        EXCEPT ALL
+                        SELECT SearchTerm, Country FROM SearchesDailyQ2;
+
+SeachesDailyQ1MinusQ2 = SELECT a.*,b.TotalSearches 
+                        FROM SeachesDailyQ1MinusQ2 AS a 
+                             INNER JOIN SearchesDailyQ1 AS b 
+                             ON a.SearchTerm == b.SearchTerm AND a.Country == b.Country;
+
+OUTPUT SeachesDailyQ0MinusQ2 TO SSTREAM @outputZeroResultsQ3string CLUSTERED BY SearchTerm, Country
+        SORTED BY TotalSearches DESC;
+
+OUTPUT SeachesDailyQ1MinusQ2 TO SSTREAM @outputZeroResultsQ4string CLUSTERED BY SearchTerm, Country
+        SORTED BY TotalSearches DESC;
+
+ZeroResultsConversion = SELECT a.*,b.TotalSearches AS ZeroResultsSearches
+                        FROM BaseDataDailyQ3 AS a 
+                             INNER JOIN SeachesDailyQ1MinusQ2 AS b 
+                             ON a.SearchTerm == b.SearchTerm AND a.Country == b.Country;
+
+BaseDataDailyQ4 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName LIKE "%SFA-EXP-d161b448ec%" 
+          AND Country IN ("FR","DE","MX","ES","BR")
+;
+
+TotalSearchesNewQuery = SELECT a.*,b.TotalSearches AS ZeroResultsSearches
+                        FROM BaseDataDailyQ4 AS a 
+                             INNER JOIN SeachesDailyQ1MinusQ2 AS b 
+                             ON a.SearchTerm == b.SearchTerm AND a.Country == b.Country;
+
+SearchesDailyNewQuery =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearchesNewQuery
+    FROM TotalSearchesNewQuery;
+
+
+SearchesDaily =
+    SELECT SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearchesOldQuery
+    FROM ZeroResultsConversion;
+
+SearchClicksAndInstallsDaily = SELECT SearchTerm, Country, PageImpressionGuid, ProductId,
+                            COUNT(DISTINCT PageImpressionGuid) AS Clicks,
+                            Math.Min(1, SUM(AttemptedAcquisitionOrInstall) ) AS Installs
+                          FROM ZeroResultsConversion
+                          WHERE IsClicked == 1;
+
+TotalClicksAndInstallsDaily =
+    SELECT SearchTerm,
+           Country,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstallsDaily;
+
+SearchesAggDaily = 
+    SELECT a.*,
+           d.TotalSearchesNewQuery,
+           c.ZeroResultsSearches,
+           b.TotalClicks,
+           b.TotalInstalls
+    FROM SearchesDaily AS a 
+         LEFT JOIN TotalClicksAndInstallsDaily AS b 
+         ON a.SearchTerm == b.SearchTerm AND a.Country == b.Country
+         LEFT JOIN ZeroResultsConversion AS c 
+         ON a.SearchTerm == c.SearchTerm AND a.Country == c.Country
+         LEFT JOIN SearchesDailyNewQuery AS d
+         ON a.SearchTerm == d.SearchTerm AND a.Country == d.Country
+         ;
+        
+SearchesTotalClicksInstallsAndSearchCountDaily =
+    SELECT DISTINCT *
+//           TotalInstalls * 100.0 / TotalClicks AS InstallsToClicksPercentageOldQuery,
+//           TotalInstalls * 100.0 / TotalSearches AS  ConversionPercentageOldQuery,
+//           TotalClicks * 100.0 / TotalSearches AS CTRPercentageOldQuery
+    FROM SearchesAggDaily;
+
+OUTPUT SearchesTotalClicksInstallsAndSearchCountDaily TO SSTREAM @outputZeroResultsQ5string
+  CLUSTERED BY SearchTerm, Country
+        SORTED BY ZeroResultsSearches DESC, TotalSearchesNewQuery DESC, TotalClicks DESC, TotalInstalls DESC;
+
+OUTPUT SearchesTotalClicksInstallsAndSearchCountDaily 
+    TO @outputZeroResultsQ5stringcsv
+    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);

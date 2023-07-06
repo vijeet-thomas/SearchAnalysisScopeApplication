@@ -1,0 +1,86 @@
+﻿//Script GUID:50c88c2b-5ee8-4afb-b450-4a73e1cfdaa6
+//Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate;
+#DECLARE firstDay DateTime = new DateTime(2023, 4, 1);
+#DECLARE lastDay DateTime = new DateTime(2023, 6, 30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE firstDayString string = @firstDay.ToString("yyyy-MM-dd");
+#DECLARE lastDayString string = @lastDay.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas";
+#DECLARE outputGuardRailDaily string  = string.Format("{0}/GuardRailMetricsSessionLevel/Optimus/GuardRailMetricsDaily_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+
+searchProductsDaily =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs/SearchProduct/SearchProduct_Default.view"
+    PARAMS
+    (
+        StartDate = @firstDayString,
+        EndDate = @lastDayString
+    )
+;
+
+BaseDataDaily =
+    SELECT  DateId AS Timestamp,
+            CVRoot,
+            ImpressionGuid,
+            AppVersion,
+            Market,
+            Country,	
+            SearchTerm,
+            SuggestedTerm,
+            SearchType,
+            ContentSource,
+            FlightName,
+            ProductId,
+            ProductName,
+            ProductType,
+            SlotNumber,
+            IsInline,
+            IsClicked,	
+            IsAttemptedAcquisition,
+            IsSuccessfulAcquisition
+    FROM searchProductsDaily
+    WHERE 
+          SearchType == "Regular" 
+          OR (SearchType == "AutoSuggest" AND !string.IsNullOrEmpty(SuggestedTerm) AND IsClicked == 1)
+          OR (SearchType == "AutoSuggest" AND !string.IsNullOrEmpty(ProductId) AND IsClicked == 1)
+    ;
+
+SearchesDaily =
+    SELECT Timestamp,
+           COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM BaseDataDaily;
+
+SearchClicksAndInstallsDaily = SELECT  Timestamp,
+                                COUNT(DISTINCT CVRoot) AS Clicks,
+                                SUM(IsAttemptedAcquisition) AS Installs
+                          FROM BaseDataDaily
+                          WHERE IsClicked == 1;
+
+TotalClicksAndInstallsDaily =
+    SELECT Timestamp,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstallsDaily;
+
+SearchesAggDaily = 
+    SELECT a.*,
+           b.TotalClicks,
+           b.TotalInstalls
+    FROM SearchesDaily AS a INNER JOIN TotalClicksAndInstallsDaily AS b ON a.Timestamp == b.Timestamp;
+
+SearchesTotalClicksInstallsAndSearchCountDaily =
+    SELECT *,
+           //TotalInstalls * 100.0 / TotalClicks AS InstallsToClicksPercentage,
+           TotalInstalls * 100.0 / TotalSearches AS  Conversion,
+           TotalClicks * 100.0 / TotalSearches AS CTR
+    FROM SearchesAggDaily;
+
+OUTPUT SearchesTotalClicksInstallsAndSearchCountDaily TO SSTREAM @outputGuardRailDaily
+  CLUSTERED BY  Timestamp
+        SORTED BY TotalSearches DESC, TotalClicks DESC, TotalInstalls DESC;
+

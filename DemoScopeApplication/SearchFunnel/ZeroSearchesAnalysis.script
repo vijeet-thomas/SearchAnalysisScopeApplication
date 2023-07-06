@@ -1,0 +1,69 @@
+﻿//Script GUID:50115a06-220a-4d6d-8c62-6a1a200cf574
+//Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 7), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-29);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis";
+#DECLARE inputBaseDataMarch string  = string.Format("{0}/BaseDataSFAMarch2.ss",@rootFolder);
+#DECLARE inputBaseDataApril string  = string.Format("{0}/BaseDataSFAApril2.ss",@rootFolder);
+#DECLARE outputZeroSearchTermsApril string  = string.Format("{0}/ZeroAnalysis/ZeroResultSearchTermAnalysisApril.ss",@rootFolder);
+#DECLARE outputZeroSearchTermsProductsApril string  = string.Format("{0}/ZeroAnalysis/ZeroResultSearchTermAnalysisProductsApril.ss",@rootFolder);
+#DECLARE outputZeroSearchTermsMarch string  = string.Format("{0}/ZeroAnalysis/ZeroResultSearchTermAnalysisMarch.ss",@rootFolder);
+#DECLARE outputZeroSearchTermsProductsMarch string  = string.Format("{0}/ZeroAnalysis/ZeroResultSearchTermAnalysisProductsMarch.ss",@rootFolder);
+
+inputData =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataApril
+    )
+    WHERE Market == "IN"
+    ;
+
+TotalSearches =
+    SELECT SearchTerm,
+           COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM inputData;
+
+BaseDataDailyQ0 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          ContentSource == "ZeroResult"
+          ;
+
+ZeroSearches =
+    SELECT SearchTerm,
+           COUNT(DISTINCT CVRoot) AS ZeroSearches
+    FROM BaseDataDailyQ0;
+
+Searches = SELECT b.*, a.TotalSearches FROM TotalSearches AS a INNER JOIN ZeroSearches AS b ON a.SearchTerm == b.SearchTerm;
+
+Searches = SELECT *,
+                  (ZeroSearches * 100.0 / TotalSearches) AS ZeroPercentage
+                  FROM Searches WHERE TotalSearches > 1000;
+
+OUTPUT Searches TO SSTREAM @outputZeroSearchTermsApril
+CLUSTERED BY SearchTerm
+SORTED BY ZeroPercentage DESC; 
+
+SearchesProducts =
+    SELECT SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           COUNT(DISTINCT CVRoot) AS ZeroSearches
+    FROM BaseDataDailyQ0;
+
+SearchesproductsSummary = SELECT b.*, a.TotalSearches FROM TotalSearches AS a INNER JOIN SearchesProducts AS b ON a.SearchTerm == b.SearchTerm;
+
+SearchesproductsSummary = SELECT *,
+                  (ZeroSearches * 100.0 / TotalSearches) AS ZeroPercentage
+                  FROM SearchesproductsSummary WHERE TotalSearches > 1000;
+
+OUTPUT SearchesproductsSummary TO SSTREAM @outputZeroSearchTermsProductsApril
+CLUSTERED BY SearchTerm, ProductId, ProductDisplayName
+SORTED BY ZeroPercentage DESC;
+
+

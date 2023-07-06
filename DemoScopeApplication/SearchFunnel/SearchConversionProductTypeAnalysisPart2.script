@@ -1,0 +1,38 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:cfca1e85-411f-4d96-a34f-83a619ca8944
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE inputComparisonStream3 string = string.Format("{0}/ConversionSearchTermProductAnalysisWithProductType.ss", @rootFolder);
+
+#DECLARE outputComparisonStream3 string = string.Format("{0}/ProductTypeSummary.ss", @rootFolder);
+
+inputStream =
+SELECT *
+FROM
+(
+    SSTREAM @inputComparisonStream3
+);
+
+typeSummary =
+    SELECT ProductCatalog,
+           SUM(TotalSearchesMarch) AS TotalSearchesMarch,
+           SUM(MarchClicks) AS MarchClicks,
+           SUM(MarchInstalls) AS MarchInstalls,
+           SUM(TotalSearchesApril) AS TotalSearchesApril,
+           SUM(AprilClicks) AS AprilClicks,
+           SUM(AprilInstalls) AS AprilInstalls
+    FROM inputStream;
+
+typeSummary =
+    SELECT *,
+           (MarchClicks * 100.0 / TotalSearchesMarch) AS CTRMarchPercentage,
+           (MarchInstalls * 100.0 / TotalSearchesMarch) AS ConversionMarchPercentage,
+           (AprilClicks * 100.0 / TotalSearchesApril) AS CTRAprilPercentage,
+           (AprilInstalls * 100.0 / TotalSearchesApril) AS ConversionAprilPercentage
+    FROM typeSummary;
+
+OUTPUT typeSummary
+TO SSTREAM @outputComparisonStream3;

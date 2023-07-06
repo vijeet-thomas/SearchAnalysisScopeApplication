@@ -16,8 +16,8 @@ MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScri
 //----------------------------------------------------------------------------------------------------------------------------------------------------
 
 // Stream Parameters
-#DECLARE oldStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2021/12/AggregatedScore_2021_12_01.ss";
-#DECLARE newStream string = @"/users/vijeetthomas/search/Ratings/2021/12/AggregatedScore_2021_12_06.ss";
+#DECLARE oldStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_23.ss";
+#DECLARE newStream string = @"/users/vijeetthomas/Search/RelevanceScore/2022/10/AggregatedScore_2022_10_30.ss";
 
 oldData =   
     SELECT *
@@ -27,61 +27,13 @@ oldData =
     );
 
 oldData =  
-    SELECT ProductId,
+    SELECT DISTINCT ProductId,
            Market,
-           AggregateScore AS OldAggregateScore
+           AggregateScore AS OldAggregateScore,
+           RatingCountCleanedAG AS OldRatingCount
     FROM oldData
-    WHERE Market == "US"
-          AND ProductId IN ("8D6KGWZL66K5",
-"8D6KGWZR35W2",
-"8D6KGWZL6F8C",
-"8D6KGWZL65M6",
-"8D6KGX0BMXV1",
-"8D6KGWXN27MN",
-"8D6KGWXN6WCF",
-"8D6KGWZL6CVF",
-"8D6KGWXMZKKK",
-"8D6KGWZL6FCV",
-"8D6KGWX5KM9R",
-"8D6KGX0L1KJW",
-"8D6KGWXQ40PJ",
-"8D6KGWZT5Z42",
-"8D6KGWZL66KL",
-"8D6KGWXKDZ27",
-"8D6KGWZL6B9M",
-"8D6KGWXN7NWB",
-"8D6KGWZL6659",
-"8D6KGWXMZMZH",
-"8D6KGX043336",
-"8D6KGWXN30DN",
-"8D6KGWX45W48",
-"8D6KGWZL6FP8",
-"8D6KGWZL670V",
-"8D6KGWXH1D9P",
-"8D6KGWZL6G97",
-"8D6KGWZL6DNZ",
-"8D6KGWXN929L",
-"8D6KGWZL6F7D",
-"8D6KGWZL6CMV",
-"8D6KGWZL6D9R",
-"8D6KGWZL65GJ",
-"8D6KGX0PR9JQ",
-"8D6KGX05SHFH",
-"8D6KGWXN6RFV",
-"8D6KGWZL6F6Z",
-"8D6KGWZR4TGN",
-"8D6KGWXN333B",
-"8D6KGWXN2FXD",
-"8D6KGWXN3XZ2",
-"8D6KGWXP5BM2",
-"8D6KGWX88K92",
-"8D6KGWZL6BZR",
-"8D6KGWXCR7GG",
-"8D6KGWZL6F7Q",
-"8D6KGWXN3QGR",
-"8D6KGWXN20WQ",
-"8D6KGWZL6FLP",
-"8D6KGWXHP030");
+    WHERE Market IN ("US","GB","AU","CA")
+          AND ProductId IN ("9P3CP9G025RM","9WZDNCRFHWQT","9P2HTZQ722V3","9N2F0P0166HF","9NBLGGH67WLK","9MWDP4QTXDXH","9WZDNCRD2WF1","9NWRS3JZK6FN","9NQTQNQVVDCK","9NBLGGH2JZSG");
 
 newData =
     SELECT *
@@ -91,72 +43,27 @@ newData =
     );
 
 newData = 
-    SELECT ProductId,
+    SELECT DISTINCT ProductId,
            Market,
-           AggregateScore AS NewAggregateScore
+           AggregateScore AS NewAggregateScore,
+           RatingCountCleanedAG AS NewRatingCount
     FROM newData
-    WHERE Market == "US"
-          AND ProductId IN ("8D6KGWZL66K5",
-"8D6KGWZR35W2",
-"8D6KGWZL6F8C",
-"8D6KGWZL65M6",
-"8D6KGX0BMXV1",
-"8D6KGWXN27MN",
-"8D6KGWXN6WCF",
-"8D6KGWZL6CVF",
-"8D6KGWXMZKKK",
-"8D6KGWZL6FCV",
-"8D6KGWX5KM9R",
-"8D6KGX0L1KJW",
-"8D6KGWXQ40PJ",
-"8D6KGWZT5Z42",
-"8D6KGWZL66KL",
-"8D6KGWXKDZ27",
-"8D6KGWZL6B9M",
-"8D6KGWXN7NWB",
-"8D6KGWZL6659",
-"8D6KGWXMZMZH",
-"8D6KGX043336",
-"8D6KGWXN30DN",
-"8D6KGWX45W48",
-"8D6KGWZL6FP8",
-"8D6KGWZL670V",
-"8D6KGWXH1D9P",
-"8D6KGWZL6G97",
-"8D6KGWZL6DNZ",
-"8D6KGWXN929L",
-"8D6KGWZL6F7D",
-"8D6KGWZL6CMV",
-"8D6KGWZL6D9R",
-"8D6KGWZL65GJ",
-"8D6KGX0PR9JQ",
-"8D6KGX05SHFH",
-"8D6KGWXN6RFV",
-"8D6KGWZL6F6Z",
-"8D6KGWZR4TGN",
-"8D6KGWXN333B",
-"8D6KGWXN2FXD",
-"8D6KGWXN3XZ2",
-"8D6KGWXP5BM2",
-"8D6KGWX88K92",
-"8D6KGWZL6BZR",
-"8D6KGWXCR7GG",
-"8D6KGWZL6F7Q",
-"8D6KGWXN3QGR",
-"8D6KGWXN20WQ",
-"8D6KGWZL6FLP",
-"8D6KGWXHP030");
+    WHERE Market IN ("US","GB","AU","CA")
+          AND ProductId IN ("9P3CP9G025RM","9WZDNCRFHWQT","9P2HTZQ722V3","9N2F0P0166HF","9NBLGGH67WLK","9MWDP4QTXDXH","9WZDNCRD2WF1","9NWRS3JZK6FN","9NQTQNQVVDCK","9NBLGGH2JZSG");
 
 comparisonStream =
     SELECT o.ProductId,
            o.Market,
            o.OldAggregateScore,
-           n.NewAggregateScore
+           o.OldRatingCount,
+           n.NewAggregateScore,
+           n.NewRatingCount
     FROM oldData AS o
          LEFT JOIN
              newData AS n
-         ON o.ProductId == n.ProductId;
+         ON o.ProductId == n.ProductId
+        AND o.Market  == n.Market;
 
 OUTPUT comparisonStream
-TO SSTREAM "/users/vijeetthomas/search/Comparison/TVStreamComparison.ss"
+TO SSTREAM "/users/vijeetthomas/search/Comparison/StreamComparison.ss"
    WITH STREAMEXPIRY "7";

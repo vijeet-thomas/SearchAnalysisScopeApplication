@@ -1,0 +1,134 @@
+﻿//Script GUID:e55b635c-dccf-4558-9d76-d059def0e2d7
+//Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 10), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-31);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/OSVersionAnalytics";
+#DECLARE outputStreamAllConversion = string.Format("{0}/OSAnalytics3_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputStreamAllConversionCsv = string.Format("{0}/OSAnalytics3_{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+//#DECLARE UniversalView string = @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view";
+#DECLARE UniversalView string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view";
+
+inputData =
+    VIEW @UniversalView
+    PARAMS
+    (
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    )
+;
+
+BaseDataDailyQ0 =
+    SELECT *
+           //CVFull.Split('.')[0] AS CVRoot
+    FROM inputData
+    WHERE 
+          !AppVer.StartsWith("222")
+          AND (SearchType == "Regular" OR SearchType == "Autosuggest")
+          AND IsFinalSearch == true
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND SlotNumber >= 0
+          ;
+
+SearchesDailyOldQuery =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM BaseDataDailyQ0;
+
+ZeroSearchesOld = SELECT * FROM BaseDataDailyQ0 WHERE ContentSource == "ZeroResult";
+ZeroSearchesOld =
+    SELECT COUNT(DISTINCT CVRoot) AS ZeroSearches
+    FROM ZeroSearchesOld;
+
+SearchClicksAndInstallsDailyOld = SELECT 
+                            COUNT(DISTINCT CVRoot) AS Clicks,
+                            SUM(AttemptedAcquisitionOrInstall) AS Installs
+                          FROM BaseDataDailyQ0
+                          WHERE IsClicked == 1;
+
+SearchesAggDailyOld = 
+    SELECT *
+    FROM SearchesDailyOldQuery AS a
+         CROSS JOIN SearchClicksAndInstallsDailyOld AS b 
+         CROSS JOIN ZeroSearchesOld AS c
+         ;
+        
+SearchesTotalClicksInstalls =
+    SELECT *,
+           ZeroSearches *100.0/ TotalSearches AS ZeroSearchesPercentage,
+           Installs * 100.0 / TotalSearches AS ConversionPercentage,
+           Clicks * 100.0 / TotalSearches AS CTRPercentage
+    FROM SearchesAggDailyOld;
+
+BaseDataDailyQ1 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer.StartsWith("222")
+          AND (SearchType == "Regular" OR SearchType == "Autosuggest")
+          AND IsFinalSearch == true
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND SlotNumber >= 0
+          ;
+
+ZeroSearchesNew = SELECT * FROM BaseDataDailyQ1 WHERE ContentSource == "ZeroResult";
+ZeroSearchesNew =
+    SELECT COUNT(DISTINCT CVRoot) AS ZeroSearches
+    FROM ZeroSearchesNew;
+
+SearchesDailyNewQuery =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM BaseDataDailyQ1;
+
+SearchClicksAndInstallsDailyNew = SELECT 
+                            COUNT(DISTINCT CVRoot)  AS Clicks,
+                            SUM(AttemptedAcquisitionOrInstall) AS Installs
+                          FROM BaseDataDailyQ1
+                          WHERE IsClicked == 1;
+
+SearchesAggDailyNew = 
+    SELECT *
+    FROM SearchesDailyNewQuery AS a
+         CROSS JOIN SearchClicksAndInstallsDailyNew AS b 
+         CROSS JOIN ZeroSearchesNew AS c
+         ;
+        
+SearchesTotalClicksInstallsNew =
+    SELECT *,
+           ZeroSearches *100.0/ TotalSearches AS ZeroSearchesPercentage,
+           Installs * 100.0 / TotalSearches AS ConversionPercentage,
+           Clicks * 100.0 / TotalSearches AS CTRPercentage
+    FROM SearchesAggDailyNew;
+
+FinalSearchesData = 
+    SELECT  "Windows 10" AS GroupName,
+            *
+       FROM SearchesTotalClicksInstalls 
+       UNION ALL
+       SELECT "Windows 11" AS GroupName,
+              * FROM SearchesTotalClicksInstallsNew 
+;
+
+ComparisonMetrics = 
+    SELECT  GroupName,
+            SUM(TotalSearches) AS TotalSearches,
+            SUM(Clicks) AS Clicks,
+            SUM(Installs) AS Installs,
+            SUM(ZeroSearches) AS ZeroSearches,
+            SUM(ZeroSearches)*100.0/SUM(TotalSearches) AS ZeroSearchesPercentage,
+            SUM(Installs)*100.0/SUM(TotalSearches) AS ConversionPercentage,
+            SUM(Clicks)*100.0/SUM(TotalSearches) AS CTRPercentage
+    FROM FinalSearchesData;
+
+
+OUTPUT ComparisonMetrics TO SSTREAM @outputStreamAllConversion
+;
+//CLUSTERED BY SearchTerm,Country
+//        SORTED BY TotalSearchesNewQuery DESC, ClicksNewQuery DESC, InstallsNewQuery DESC;
+
+OUTPUT FinalSearchesData
+    TO @outputStreamAllConversionCsv
+    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);

@@ -1,0 +1,61 @@
+﻿//Script GUID:e6247d8b-3b7d-4d2a-8be8-f7027d45ff46
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-29);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/Search/QOptimizationMetrics";
+#DECLARE outputAllResultsForza = string.Format("{0}/AllSearchesForza_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputZeroResultsQ0string  = string.Format("{0}/ZeroSearchesForzaByDate_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputZeroResultsQ5stringcsv  = string.Format("{0}/ZeroResultsConversion_{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+//#DECLARE inputStreamExperimentation = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/2022/11/ExperimentationSearchProduct_{1:yyyy}_{1:MM}_{1:dd}.ss",@endDate);
+
+inputData =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    )
+;
+
+BaseDataDailyQ0 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName LIKE "%SFA-EXP-d161b448ec%" 
+          //AND ContentSource == "ZeroResult"
+          AND Country IN ("FR","DE","MX","ES","BR")
+          AND SearchTerm == "Forza Horizon 3";
+
+OUTPUT BaseDataDailyQ0 TO SSTREAM @outputAllResultsForza;
+
+BaseDataDailyQ1 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName LIKE "%SFA-EXP-d161b448ec%" 
+          AND ContentSource == "ZeroResult"
+          AND Country IN ("FR","DE","MX","ES","BR")
+          AND SearchTerm == "Forza Horizon 3";
+                       
+SearchesDailyQ1 =
+        SELECT DateId,
+           SearchTerm,
+           Country,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+        FROM BaseDataDailyQ1;
+
+OUTPUT SearchesDailyQ1 TO SSTREAM @outputZeroResultsQ0string 
+CLUSTERED BY DateId, SearchTerm, Country
+        SORTED BY TotalSearches DESC;

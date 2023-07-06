@@ -1,0 +1,58 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:cfca1e85-411f-4d96-a34f-83a619ca8944
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE inputComparisonStream3 string = string.Format("{0}/ConversionSearchTermProductAnalysis.ss", @rootFolder);
+#DECLARE outputComparisonStream3 string = string.Format("{0}/ConversionSearchTermProductAnalysisWithProductType.ss", @rootFolder);
+#DECLARE sparkProductsStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSparkProduct.ss";
+#DECLARE bigcatProductsStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimBigCatProduct.ss";
+
+inputStream =
+SELECT *
+FROM
+(
+    SSTREAM @inputComparisonStream3
+);
+
+sparkProducts =
+    SELECT *
+    FROM
+    (
+        SSTREAM @sparkProductsStream
+    );
+
+sparkProducts = 
+    SELECT a.*, "Spark" AS ProductCatalog
+    FROM inputStream AS a 
+         INNER JOIN sparkProducts AS b
+         ON a.ProductId == b.ProductId
+    WHERE a.ProductId IS NOT NULL;
+
+bigCatProducts =
+    SELECT *
+    FROM
+    (
+        SSTREAM @bigcatProductsStream
+    );
+
+bigCatProducts = 
+    SELECT a.*, "BigCat" AS ProductCatalog
+    FROM inputStream AS a 
+         INNER JOIN bigCatProducts AS b
+         ON a.ProductId == b.ProductId
+    WHERE a.ProductId IS NOT NULL;
+
+finalCatalog =
+    SELECT *
+    FROM sparkProducts
+    UNION ALL
+    SELECT *
+    FROM bigCatProducts;
+
+OUTPUT finalCatalog
+TO SSTREAM @outputComparisonStream3
+CLUSTERED BY SearchTerm, ProductId
+SORTED BY TotalSearchesApril DESC, AprilInstalls DESC, AprilClicks DESC;

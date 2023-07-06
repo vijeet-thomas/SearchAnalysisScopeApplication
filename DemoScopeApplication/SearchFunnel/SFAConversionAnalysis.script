@@ -1,0 +1,44 @@
+﻿//Script GUID:0213aa49-2214-46e7-bf39-b1cbc96526a3
+//Used for tracking history
+#DECLARE startDateOneMonth DateTime = DateTime.UtcNow.AddDays(-90);
+//#DECLARE endDate DateTime = DateTime.UtcNow.AddDays(-);
+#DECLARE startDateMarch DateTime = new DateTime(2023, 03, 01);
+#DECLARE endDateMarch DateTime = new DateTime(2023, 03, 31);
+#DECLARE startDateApril DateTime = new DateTime(2023, 04, 01);
+#DECLARE endDateApril DateTime = new DateTime(2023, 04, 30);
+#DECLARE startDateMarchString string = @startDateMarch.ToString("yyyy-MM-dd");
+#DECLARE endDateMarchString string = @endDateMarch.ToString("yyyy-MM-dd");
+#DECLARE startDateAprilString string = @startDateApril.ToString("yyyy-MM-dd");
+#DECLARE endDateAprilString string = @endDateApril.ToString("yyyy-MM-dd");
+#DECLARE fileDate DateTime = DateTime.UtcNow.AddDays(0);
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE outputStream string = string.Format("{0}/SFAConversion.ss", @rootFolder);
+#DECLARE streamExpiryString string = "60";
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+
+SFADataNew =
+    VIEW @SFAView
+    PARAMS 
+    (
+        startDate = @startDateAprilString,
+        endDate = @endDateAprilString
+    )
+;
+
+SFADataNew =
+    SELECT *
+    FROM SFADataNew
+    WHERE !String.IsNullOrEmpty(Ref_CustomAttribute_3)
+          AND Ref_CustomAttribute_3.ToLower().Trim() IN("roblox", "minecraft");
+
+SearchData = SELECT Ref_CustomAttribute_3.ToLower().Trim() AS SearchTerm,
+                                              COUNT(DISTINCT CVRoot) AS TotalSearches,
+                                              SUM(AttemptedAcquisitionCount) AS TotalInstalls
+                                              FROM SFADataNew
+                  WHERE PageName == "searchPage";
+
+TotalSearchData = SELECT *, (TotalInstalls * 100.0 / TotalSearches) AS ConversionPercentage FROM SearchData;
+
+OUTPUT TotalSearchData 
+TO SSTREAM @outputStream
+WITH STREAMEXPIRY @streamExpiryString;

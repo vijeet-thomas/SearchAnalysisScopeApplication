@@ -1,0 +1,180 @@
+//Script GUID:3f01fd36-e75b-485c-a4a8-ac1a8baa5864
+//Used for tracking history
+
+
+#DECLARE universalStoreView string = @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"; 
+#DECLARE streamExpiryString string = "60";
+#DECLARE startDate DateTime = DateTime.UtcNow.AddDays(-2);
+#DECLARE endDate DateTime = DateTime.UtcNow.AddDays(-2);
+#DECLARE fileDate DateTime = DateTime.UtcNow.AddDays(0);
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+
+#DECLARE outputRoot string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/RelevanceScoreDashboard/Data/";
+#DECLARE St_ACP_Analysis_CSV string = string.Format("{0}/{1:yyyy}/{1:MM}/SearchACPMappingSearchTermLevel_{1:yyyy}_{1:MM}_{1:dd}.csv", @outputRoot.TrimEnd(new[]{ '/' }), @fileDate);
+#DECLARE St_ACP_Analysis_SS string = string.Format("{0}/{1:yyyy}/{1:MM}/SearchACPMappingSearchTermLevel_{1:yyyy}_{1:MM}_{1:dd}.ss", @outputRoot.TrimEnd(new[]{ '/' }), @fileDate);
+#DECLARE Pr_ACP_Analysis_CSV string = string.Format("{0}/{1:yyyy}/{1:MM}/SearchACPMappingProductLevel_{1:yyyy}_{1:MM}_{1:dd}.csv", @outputRoot.TrimEnd(new[]{ '/' }), @fileDate);
+#DECLARE Pr_ACP_Analysis_SS string = string.Format("{0}/{1:yyyy}/{1:MM}/SearchACPMappingProductLevel_{1:yyyy}_{1:MM}_{1:dd}.ss", @outputRoot.TrimEnd(new[]{ '/' }), @fileDate);
+#DECLARE Guardrail_Metrics_CSV string = string.Format("{0}/{1:yyyy}/{1:MM}/SearchACPMapping_Guardrail_Metrics_{1:yyyy}_{1:MM}_{1:dd}.csv", @outputRoot.TrimEnd(new[]{ '/' }), @fileDate);
+#DECLARE Guardrail_Metrics_SS string = string.Format("{0}/{1:yyyy}/{1:MM}/SearchACPMapping_Guardrail_Metrics_{1:yyyy}_{1:MM}_{1:dd}.ss", @outputRoot.TrimEnd(new[]{ '/' }), @fileDate);
+
+// This view will be used to get searches
+searchProducts =
+    VIEW @universalStoreView
+    PARAMS
+    (
+        startDate = @startDateString,
+        endDate = @endDateString
+    )
+;
+
+// getting all the base data we would need
+
+BaseData =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           PageImpressionGuid,
+           UserIdFull.ToLower() AS UserIdFull,
+           AttemptedInstalls IS NULL? 0 : AttemptedInstalls AS AttemptedInstalls,
+           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial,
+           ResultingSuccessfulAcquisitions_Free IS NULL? 0 : ResultingSuccessfulAcquisitions_Free AS ResultingSuccessfulAcquisitions_Free,
+           ResultingSuccessfulAcquisitions_Paid IS NULL? 0 : ResultingSuccessfulAcquisitions_Paid AS ResultingSuccessfulAcquisitions_Paid,
+           ResultingSuccessfulAcquisitions_Trial IS NULL? 0 : ResultingSuccessfulAcquisitions_Trial AS ResultingSuccessfulAcquisitions_Trial,
+           DateId
+    FROM searchProducts
+    WHERE
+    IsTest != 1
+    AND SearchType == "Regular"
+    AND DeviceClass == "Windows.Desktop"
+    AND SlotNumber >= 0
+    AND SearchTerm.Length > 0;     
+
+//Finding the count of how many times a particular search term is being searched
+Searches =
+    SELECT SearchTerm,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseData;
+
+// finding clicks and installs 
+SearchClicksAndInstalls = SELECT SearchTerm, PageImpressionGuid, ProductId, ProductDisplayName, SlotNumber, DateId,
+                            COUNT(DISTINCT PageImpressionGuid) AS Clicks,
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs							
+                          FROM BaseData
+                          WHERE IsClicked == true;
+
+// finding product level ACP - step 1
+ProductLevelACPCalc = SELECT SearchTerm, ProductId, ProductDisplayName, DateId, @startDate AS TIMESTAMP,
+                            SUM(Clicks) AS Clicks, 
+                            AVG(SlotNumber) AS ACP
+                      FROM SearchClicksAndInstalls;
+
+// finding product level ACP - step 2
+ProductLevelACP =
+    SELECT ProductLevelACPCalc.SearchTerm,
+           ProductLevelACPCalc.ProductId,
+           ProductLevelACPCalc.ProductDisplayName,
+           ProductLevelACPCalc.DateId,
+           ProductLevelACPCalc.TIMESTAMP,
+           ProductLevelACPCalc.Clicks,
+           ProductLevelACPCalc.ACP,
+           Searches.TotalSearches
+    FROM ProductLevelACPCalc
+    INNER JOIN
+        Searches
+        ON ProductLevelACPCalc.SearchTerm == Searches.SearchTerm;
+						  
+// finding search term level ACP - step 1
+SearchTermLevelACPCalc1 = SELECT SearchTerm, ProductId, DateId,
+							Clicks * ACP AS WeightedSum,
+							Clicks							
+                          FROM ProductLevelACPCalc;						  
+
+// finding search term level ACP - step 2
+SearchTermLevelACPCalc2 = SELECT SearchTerm, DateId,
+							SUM(WeightedSum) AS SumOfWeightedACP,
+							SUM(Clicks) AS SumOfClicks					
+                          FROM SearchTermLevelACPCalc1;		
+
+// finding search term level ACP - step 3
+SearchTermLevelACPCalc3 = SELECT SearchTerm, DateId,
+							SumOfWeightedACP/SumOfClicks AS ACP, @startDate AS TIMESTAMP
+                          FROM SearchTermLevelACPCalc2;
+
+// finding search term level ACP - step 4
+SearchTermLevelACP =
+    SELECT SearchTermLevelACPCalc3.SearchTerm,
+           SearchTermLevelACPCalc3.DateId,
+           SearchTermLevelACPCalc3.ACP,
+           SearchTermLevelACPCalc3.TIMESTAMP,
+           Searches.TotalSearches
+
+    FROM SearchTermLevelACPCalc3
+    INNER JOIN
+        Searches
+        ON SearchTermLevelACPCalc3.SearchTerm == Searches.SearchTerm;
+
+TotalClicksAndInstalls =
+    SELECT SearchTerm,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstalls;
+
+// Search Count for current month
+SearchesAgg = 
+    SELECT a.*,
+           b.TotalClicks,
+           b.TotalInstalls
+    FROM Searches AS a LEFT JOIN TotalClicksAndInstalls AS b ON a.SearchTerm == b.SearchTerm;
+
+
+SearchesTotalClicksInstallsAndSearchCount =
+    SELECT *,
+           TotalInstalls * 100.0 / TotalClicks AS InstallsToClicksPercentage,
+           TotalInstalls * 100.0 / TotalSearches AS  InstallsToSearchCountPercentage,
+           TotalClicks * 100.0 / TotalSearches AS ClicksToSearchCountPercentage
+    FROM SearchesAgg;
+
+
+
+OUTPUT SearchesTotalClicksInstallsAndSearchCount
+TO @Guardrail_Metrics_CSV
+WITH STREAMEXPIRY @streamExpiryString
+USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);
+
+
+OUTPUT SearchesTotalClicksInstallsAndSearchCount
+TO SSTREAM @Guardrail_Metrics_SS
+    CLUSTERED BY SearchTerm
+    SORTED BY TotalSearches DESC             
+      WITH STREAMEXPIRY @streamExpiryString;
+
+
+OUTPUT ProductLevelACP
+TO @Pr_ACP_Analysis_CSV      
+    WITH STREAMEXPIRY @streamExpiryString
+USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);
+
+
+OUTPUT ProductLevelACP
+TO SSTREAM @Pr_ACP_Analysis_SS
+    CLUSTERED BY SearchTerm
+    SORTED BY Clicks DESC             
+      WITH STREAMEXPIRY @streamExpiryString;
+
+
+OUTPUT SearchTermLevelACP
+TO @St_ACP_Analysis_CSV
+    WITH STREAMEXPIRY @streamExpiryString
+USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);
+
+
+OUTPUT SearchTermLevelACP
+TO SSTREAM @St_ACP_Analysis_SS
+    CLUSTERED BY SearchTerm
+      WITH STREAMEXPIRY @streamExpiryString;
+

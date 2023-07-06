@@ -14,10 +14,10 @@
 RatingsStream = SSTREAM @"/shares/asimov.prod.data/PublicPartner/Processed/DSXRatings/prod/cooked/dataForPartners/V2/MasterReviews/MasterReviews.ss";
 RatingsStream2 = SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/DSXRatings/prod/cooked/dataForPartners/V2/RatingsSummaryWithDeviceFamily/All/RatingsSummaryWithDeviceFamily.ss";
 #DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
-#DECLARE inputStream2 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_23.ss";
+#DECLARE inputStream2 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/11/AggregatedScore_2022_11_25.ss";
 
 filteredStream =
-    SELECT DISTINCT ProductId
+    SELECT DISTINCT ProductId,ProductName
     FROM
     (
         SSTREAM @inputStream
@@ -31,54 +31,56 @@ filteredStream =
 //    )
 //    WHERE Market == "US" 
 //    AND ProductId IN ("9NPFNX2NS6GX","9NDQL7SVZFPW","9NRV20M1SGRR","9NBLGGH520FV","9PJNS4F8QF4C","9P148WZH02X6","9PMFR92TZFTW","9NMJ76SP2ZHC","9PK2VTVW2HB6","9MWNFP0JJXJG","9N4QDXW44NQ2","9NXL6CKVNN9C","9MZGQTD1P6PG","9PHJNCWDGPJ2","9N8SMD2GMQVK","9P4L3571RVXL","9MV1LT12RP4F","9NBLGGH4STP7","9PL8DR48CZPN","9PPNB6NRGVZX","9NBLGGH52RR0","9N3P6L9BX3RM","9N8PKFXKJVLJ","9P4L5K3NBBRP","9N6T0WPR7MH8","9MZSWCQT9SF6","9WZDNCRD8FVZ","9P58V4XTD41X","9NFS2G5PWL94","9PCF9WS2LFD7","9P2F891DR3RX","9NQ49K27TD15","9N420VJNM3G9","9PLJLT0MSXV9","9PNKMRR5ZR5X","9PB0SJX778X1","9WZDNCRDKK1G","9MTX43LBHD1W","9NDS14F4JC8C","9MZ8NM95CPRD","9NPMR8V6S21K","9P93PTHGR4J5","9PNZBW2H0K7K","9PP8ZGTW35F2","9WZDNCRDJ6SD","9NBLGGH4V664","9NLCNS1KDCX6","9N290LL4NLVR","9P694HC4BKF2","9N2VW3MDWCDT","9MWN5B21TL4Q","9N1TWH0BPJPS","9NXLG3F7ZXCZ","9PJJL7FKTFP5","9PNQ74WV54QW","9NS4R5ZZQ9J1","9NT22L1286Q7","9N83XN7V7ZBC","9PN81VLPJW9K","9NHCGQZL7NMV","9NC23L76XH3D","9NF8Q6WS9FHF","9PKFBJ2G4H5Z","9NMMGP31QN5C","9PGLJM0HRGNF","9N2K84VMHF8B","9PHPQ83TVSHB","9NQ5D7MGJB8N","9N71GCF0VZ5W","9N7G03KQCLXG","9NQ8HS91Z5F5","9PB36SK3SCCN","9MSVDPX78RT5","9PC5VGZ1XTND","9NLW64PZ9GF6","9NKXQQMZGPHP","9NHTC4ZXD5PG","9NVBQJCTJ2WD","9MVVJLDMWPSG","9PJHG24KW7X5","9PD77BG14CJC","9N4VGNJQX8KL","9P6XR71DNGC1","9NF6ZH8RSNVV","9NBLGGH5TTZR","9N1LJ2G68HN8","9MWN707KVS6F","9PFDD3BJBVVN","9N32PT2B8ZT1","9N6Z596F7SD5","9WZDNCRDMN4W","9NC3C1ZW8VLH","9MTK5ZFSZBM5","9NWX2DNZK7CK","9NBLGGH43ZC4","9NJMPDXH40T9","9NQ7CDPJCG78","9P4WPFZ0GS16","9P59ZRVXHQXB","9NDJRQSB4T4S","9NBLGGH405J0","9N73SJ9N94P4","9PN6XVF4MHKS","9P125PBRSGJC","9P51586BZKNG","9P60HL6W7VCZ","9PFKN5R3LRDJ","9PC1XJWHLN7S","9N1HPMNJ1FSW","9PBXDSRGX240","9PDQ6HF7R3JC","9NJ2MFMDKPC2","9NM6CW0NKHN3","9P423010C01Z","9PMS2GX8M69X","9PLQS8MJ5CJH","9N913N4Z9JBC","9P5DGFRKXRT3","9NH90XDBLMQQ","9P3V16GS4MRM","9P3XF8KJ0LSM","9MV0GD2PKBPM","9N496MJTPMHJ","9NBLGGH52SDM","9PFR3NN1PRCG","9P47FNLZS4HD","9PKCD0HVHXR0","9NBLGGH1NM14","9NHFT4DPL2KP","9P6NTS4K5425","9NC131VHTV92","9PG5DH1Q027C","9PJB9045P4ZQ","9N1Q25GX2NN3","9P26HG50WW4Z","9PGX6RQ30L2M","9N5CHNCZJ40P","9N0SJPPC0FSX","9N18P16C2Z4T","9N7GQ7L0GHRL","9NHL6D6J4KDS","9MZTWW0RWX7H","9PPT40W83T9R","9P3KGS37L6V6","9PLKV7HLF8VZ","9PLGZ21CSMCQ","9NVSK5BTCMZV","9P27HBK69MLK","9N6T53SWC9CQ","9MWW0BHHM7JH","9MXBTZR6WT0W","9P74ZPM5WLHZ","9NBLGGGZBM2C","9PH8FGGR2H71","9NBLGGH4VGR4","9PD5F2D90LS5","9NX8HMCB14BD","9PNX0GR0JD2K","9PFLFQM8LHX2","9NBLGGH4SMPT","9NN8Q0TG4DJ5","9P4NTB2LW9PD","9NM39R585WTK","9NBLGGH5L89P","9NXSNQ78LTMQ","9PG55GW7P75G","9N07DCGLPBHV","9NBLGGH4VHRZ","9PM76CKTFLH7","9PKCJ1K9LTF1","9NJJC9Z14WT0","9N7XVQK08G7D","9P1C488QHJ50","9PNR2RP9D26D","9PHV179R97LV","9NBLGGH4QBQ6","9N0J47R4626N","9WZDNCRDRCT2","9NB85Q8J4JDC","9NBLGGH40KJ7","9NBLGGH4SF92","9NGM0LSDNWH2","9P7F5CJJSBBZ")
-;
+
 
 //OUTPUT engagementStream TO SSTREAM @"/users/vijeetthomas/RatingsAnalysis/FraudEngagementScores.ss";
 
-RatingData =
-    SELECT r.*
-    FROM RatingsStream AS r
-    INNER JOIN
-        filteredStream AS f
-        ON r.ProductId == f.ProductId;
- 
-
 AllRatingData =
     SELECT r.*,
-           SubmittedDateTime.ToString("yyyyMM") AS Month
-    FROM RatingsStream AS r
+           f.ProductName
+           //SubmittedDateTime.ToString("yyyyMM") AS Month
+    FROM RatingsStream2 AS r
          INNER JOIN filteredStream AS f ON r.ProductId == f.ProductId
-    WHERE SubmittedDateTime >= @startDate AND SubmittedDateTime <= @endDate
-      AND    r.ProductId IS NOT NULL
+    WHERE
+        //SubmittedDateTime >= @startDate AND SubmittedDateTime <= @endDate
+          r.ProductId IS NOT NULL
+    AND Market == "ALL"
+    AND DeviceFamily == "ALL"
     ;
 
-AllRatingData = 
-    SELECT *
-    FROM AllRatingData 
-    WHERE Month IN ("202203", "202204", "202205", "202206", "202207", "202208");
+//AllRatingData = 
+//    SELECT *
+//    FROM AllRatingData 
+//;
+//    WHERE Month IN ("202203", "202204", "202205", "202206", "202207", "202208");
 //
 //OUTPUT AllRatingData TO SSTREAM @"/users/vijeetthomas/RatingsAnalysis/RatingData.ss";
 
-Ratings =
-    SELECT ProductName,
-           ProductId,
-           IsFraudulent,
-           Market,
-           DeviceFamily,
-           Month,
-           IsFraudulent == false? 0 : 1 AS FraudInt,
-           IsFraudulent == true? 0 : 1 AS RatingInt
-    FROM AllRatingData;
+//Ratings =
+//    SELECT ProductName,
+//           ProductId,
+//           IsFraudulent,
+//           Market,
+//           DeviceFamily,
+//           Month,
+//           IsFraudulent == false? 0 : 1 AS FraudInt,
+//           IsFraudulent == true? 0 : 1 AS RatingInt
+//    FROM AllRatingData;
 
 RatingsPerProduct =
     SELECT ProductName,
            ProductId,
-           SUM(FraudInt) AS FraudCount,
-           SUM(RatingInt) AS RatingCount,
-           COUNT(*) AS TotalCount,
-           SUM(FraudInt)*100.0/COUNT(*) AS FraudPercentage,
-           SUM(RatingInt)*100.0/COUNT(*) AS GoodRatingPercentage
-    FROM Ratings;
+           FraudCount,
+           RatingCount,
+           //SUM(FraudInt) AS FraudCount,
+           //SUM(RatingInt) AS RatingCount,
+           //SUM(FraudInt) + SUM(RatingInt) AS TotalCount,
+           (FraudCount + RatingCount) AS TotalCount,
+           FraudCount * 100.0 / (FraudCount + RatingCount) AS  FraudPercentage,
+           //SUM(FraudInt)*100.0/COUNT(*) AS FraudPercentage,
+           //SUM(RatingInt)*100.0/COUNT(*) AS GoodRatingPercentage
+           RatingCount * 100.0 / (FraudCount + RatingCount) AS GoodRatingPercentage
+    FROM AllRatingData;//Ratings;
 
 RatingSummary =
     SELECT COUNTIF(TotalCount >= 1000 AND FraudPercentage >= 0 AND FraudPercentage < 10) AS Fraud0_10_Total1000,
@@ -101,8 +103,9 @@ RatingSummary =
            COUNTIF(FraudPercentage >= 70 AND FraudPercentage < 80) AS Fraud70_80,
            COUNTIF(FraudPercentage >= 80 AND FraudPercentage < 90) AS Fraud80_90,
            COUNTIF(FraudPercentage >= 90) AS Fraud90,
-           COUNTIF(RatingCount >= 0) AS GoodRatingProducts,
-           COUNTIF(TotalCount >= 0) AS TotalRatingProducts,
+           COUNTIF(RatingCount > 0) AS GoodRatingProducts,
+           COUNTIF(TotalCount > 0) AS TotalRatingProducts,
+           COUNTIF(FraudCount > 0) AS FraudRatingProducts,
            COUNTIF(TotalCount >= 1000) AS TotalRatingProductsOver1000
     FROM RatingsPerProduct;
 

@@ -1,0 +1,86 @@
+﻿//Script GUID:50c88c2b-5ee8-4afb-b450-4a73e1cfdaa6
+//Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate;
+#DECLARE firstDayMarch DateTime = new DateTime(2023, 3, 1);
+#DECLARE lastDayMarch DateTime = new DateTime(2023, 6, 30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE firstDayMarchString string = @firstDayMarch.ToString("yyyy-MM-dd");
+#DECLARE lastDayMarchString string = @lastDayMarch.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas";
+#DECLARE outputGuardRailDaily string  = string.Format("{0}/GuardRailMetricsSessionLevel/Daily/GuardRailMetricsDailyAlternate_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate.AddDays(-2));
+
+searchProductsDaily =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate = @firstDayMarchString,
+        endDate = @lastDayMarchString
+    )
+;
+
+BaseDataDaily =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           DateId AS Timestamp,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           Market,
+           PageImpressionGuid,
+           CVFull.Split('.')[0] AS CVRoot,
+           UserIdFull.ToLower() AS UserIdFull,
+           AttemptedInstalls IS NULL ? 0 : AttemptedInstalls AS AttemptedInstalls,
+           StartedPurchaseFlow_Free IS NULL ? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+           StartedPurchaseFlow_Paid IS NULL ? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+           StartedPurchaseFlow_Trial IS NULL ? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial,
+           ResultingSuccessfulAcquisitions_Free IS NULL ? 0 : ResultingSuccessfulAcquisitions_Free AS ResultingSuccessfulAcquisitions_Free,
+           ResultingSuccessfulAcquisitions_Paid IS NULL ? 0 : ResultingSuccessfulAcquisitions_Paid AS ResultingSuccessfulAcquisitions_Paid,
+           ResultingSuccessfulAcquisitions_Trial IS NULL ? 0 : ResultingSuccessfulAcquisitions_Trial AS ResultingSuccessfulAcquisitions_Trial
+    FROM searchProductsDaily
+    WHERE 
+          IsTest!= 1  
+          AND (SearchType == "Regular" OR SearchType == "Autosuggest")
+          AND IsFinalSearch == true
+          AND SlotNumber >= 0 
+          AND SearchTerm.Length > 0
+    ;
+
+SearchesDaily =
+    SELECT Timestamp,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseDataDaily;
+
+SearchClicksAndInstallsDaily = SELECT  Timestamp,
+                            COUNT(DISTINCT PageImpressionGuid) AS Clicks,
+                            SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls) AS Installs
+                          FROM BaseDataDaily
+                          WHERE IsClicked == true;
+
+TotalClicksAndInstallsDaily =
+    SELECT Timestamp,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstallsDaily;
+
+SearchesAggDaily = 
+    SELECT a.*,
+           b.TotalClicks,
+           b.TotalInstalls
+    FROM SearchesDaily AS a INNER JOIN TotalClicksAndInstallsDaily AS b ON a.Timestamp == b.Timestamp;
+
+SearchesTotalClicksInstallsAndSearchCountDaily =
+    SELECT *,
+           TotalInstalls * 100.0 / TotalClicks AS InstallsToClicksPercentage,
+           TotalInstalls * 100.0 / TotalSearches AS  InstallsToSearchCountPercentage,
+           TotalClicks * 100.0 / TotalSearches AS ClicksToSearchCountPercentage
+    FROM SearchesAggDaily;
+
+OUTPUT SearchesTotalClicksInstallsAndSearchCountDaily TO SSTREAM @outputGuardRailDaily
+  CLUSTERED BY  Timestamp
+        SORTED BY TotalSearches DESC, TotalClicks DESC, TotalInstalls DESC;
+

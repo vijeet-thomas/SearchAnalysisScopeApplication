@@ -1,0 +1,256 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:e75d0a08-4b5c-4e66-ae63-80e1d4c7debb
+// Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+//#DECLARE rootFolder string = @"/users/vijeetthomas/SearchFunnel/";
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE inputBaseDataMarch string  = string.Format("{0}/BaseDataMarch.ss",@rootFolder,@endDate);
+#DECLARE inputBaseDataApril string  = string.Format("{0}/BaseDataApril.ss",@rootFolder,@endDate);
+#DECLARE inputBaseDataJan string  = string.Format("{0}/BaseDataJan.ss",@rootFolder,@endDate);
+#DECLARE inputBaseDataFeb string  = string.Format("{0}/BaseDataFeb.ss",@rootFolder,@endDate);
+//#DECLARE outputBusinessDaily string  = string.Format("{0}/AdobeMimick/ConversionData_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+//#DECLARE outputBusinessDailyUS string  = string.Format("{0}/AdobeMimick/ConversionDataUS_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+//#DECLARE outputZeroCTR string  = string.Format("{0}/AdobeMimick/ZeroCTRSearches_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+//#DECLARE outputZeroCTRUS string  = string.Format("{0}/AdobeMimick/ZeroCTRSearchesUS_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputComparisonStream3 string = string.Format("{0}/Slot0/ConversionSearchTermProductAnalysis.ss", @rootFolder);
+
+BaseDataJan =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataJan
+    )
+    WHERE SearchTerm IN ("whatsapp","roblox","discord","msi center","minecraft","zoom")
+    AND SlotNumber == 0
+;
+
+SearchesJan =
+    SELECT //Market,
+           SearchTerm,
+           ProductId,
+           //AVG(SlotNumber) AS ACPMarch,
+           COUNT(DISTINCT CVRoot) AS TotalSearchesJan
+    FROM BaseDataJan
+         
+         ;
+    //WHERE SearchTerm IN ("whatsapp","ro","r","w","wh","wha","what","whats","min","game pass","rob","t","roblo","hp","sea","tr","sky","youtube music","stumble guys","gamepass","whatsa","jw","hill","bilibili","b","msi","calendar","alexa","robl","jio","share","cricut","atomic heart","radio","watsapp","fall guys","ë¡œë¸”ë¡ìŠ¤","cooking","whats app","transl","plants vs zombies","angry","microsoft powertoys","wolong","msi center","watsap","wei","defender","hot","cro","taskbarx","whatapp","temple run","cross","ubu","hello neighbor");
+
+SearchClicksAndInstallsJan = SELECT //Market, 
+                                      SearchTerm, 
+                                      ProductId,
+                                      CVRoot,
+                            Math.Min(1,COUNT(*)) AS Clicks,
+                            //COUNT (DISTINCT CVRoot) AS Clicks,
+                            //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                          FROM BaseDataJan
+                          //WHERE IsClicked == 1;
+                               WHERE IsClicked == true;
+
+TotalCLicksAndInstallsJan = 
+ SELECT //Market,
+        SearchTerm,
+        ProductId,
+        SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+        FROM SearchClicksAndInstallsJan;
+
+JanData =
+    SELECT a.*,
+           b.Clicks AS JanClicks,
+           b.Installs AS JanInstalls,
+           (b.Clicks*100.0/a.TotalSearchesJan) AS CTRPercentageJan,
+           (b.Installs*100.0/a.TotalSearchesJan) AS ConversionPercentageJan
+    FROM SearchesJan AS a
+    INNER JOIN
+        TotalCLicksAndInstallsJan AS b
+        ON //a.Market == b.Market AND 
+           a.SearchTerm == b.SearchTerm
+            AND a.ProductId == b.ProductId;
+
+BaseDataFeb =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataFeb
+    )
+    WHERE SearchTerm IN ("whatsapp","roblox","discord","msi center","minecraft","zoom")
+    AND SlotNumber == 0
+;
+
+SearchesFeb =
+    SELECT //Market,
+           SearchTerm,
+           ProductId,
+           //AVG(SlotNumber) AS ACPMarch,
+           COUNT(DISTINCT CVRoot) AS TotalSearchesFeb
+    FROM BaseDataFeb
+         
+         ;
+    //WHERE SearchTerm IN ("whatsapp","ro","r","w","wh","wha","what","whats","min","game pass","rob","t","roblo","hp","sea","tr","sky","youtube music","stumble guys","gamepass","whatsa","jw","hill","bilibili","b","msi","calendar","alexa","robl","jio","share","cricut","atomic heart","radio","watsapp","fall guys","ë¡œë¸”ë¡ìŠ¤","cooking","whats app","transl","plants vs zombies","angry","microsoft powertoys","wolong","msi center","watsap","wei","defender","hot","cro","taskbarx","whatapp","temple run","cross","ubu","hello neighbor");
+
+SearchClicksAndInstallsFeb = SELECT //Market, 
+                                      SearchTerm, 
+                                      ProductId,
+                                      CVRoot,
+                            Math.Min(1,COUNT(*)) AS Clicks,
+                            //COUNT (DISTINCT CVRoot) AS Clicks,
+                            //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                          FROM BaseDataFeb
+                          //WHERE IsClicked == 1;
+                               WHERE IsClicked == true;
+
+TotalCLicksAndInstallsFeb = 
+ SELECT //Market,
+        SearchTerm,
+        ProductId,
+        SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+        FROM SearchClicksAndInstallsFeb;
+
+FebData =
+    SELECT a.*,
+           b.Clicks AS FebClicks,
+           b.Installs AS FebInstalls,
+           (b.Clicks*100.0/a.TotalSearchesFeb) AS CTRPercentageFeb,
+           (b.Installs*100.0/a.TotalSearchesFeb) AS ConversionPercentageFeb
+    FROM SearchesFeb AS a
+    INNER JOIN
+        TotalCLicksAndInstallsFeb AS b
+        ON //a.Market == b.Market AND 
+           a.SearchTerm == b.SearchTerm
+            AND a.ProductId == b.ProductId;
+
+BaseDataMarch =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataMarch
+    )
+    WHERE SearchTerm IN ("whatsapp","roblox","discord","msi center","minecraft","zoom")
+    AND SlotNumber == 0
+;
+
+SearchesMarch =
+    SELECT //Market,
+           SearchTerm,
+           ProductId,
+           //AVG(SlotNumber) AS ACPMarch,
+           COUNT(DISTINCT CVRoot) AS TotalSearchesMarch
+    FROM BaseDataMarch
+         
+         ;
+    //WHERE SearchTerm IN ("whatsapp","ro","r","w","wh","wha","what","whats","min","game pass","rob","t","roblo","hp","sea","tr","sky","youtube music","stumble guys","gamepass","whatsa","jw","hill","bilibili","b","msi","calendar","alexa","robl","jio","share","cricut","atomic heart","radio","watsapp","fall guys","ë¡œë¸”ë¡ìŠ¤","cooking","whats app","transl","plants vs zombies","angry","microsoft powertoys","wolong","msi center","watsap","wei","defender","hot","cro","taskbarx","whatapp","temple run","cross","ubu","hello neighbor");
+
+SearchClicksAndInstallsMarch = SELECT //Market, 
+                                      SearchTerm, 
+                                      ProductId,
+                                      CVRoot,
+                            Math.Min(1,COUNT(*)) AS Clicks,
+                            //COUNT (DISTINCT CVRoot) AS Clicks,
+                            //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                          FROM BaseDataMarch
+                          //WHERE IsClicked == 1;
+                               WHERE IsClicked == true;
+
+TotalCLicksAndInstallsMarch = 
+ SELECT //Market,
+        SearchTerm,
+        ProductId,
+        SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+        FROM SearchClicksAndInstallsMarch;
+
+MarchData =
+    SELECT a.*,
+           b.Clicks AS MarchClicks,
+           b.Installs AS MarchInstalls,
+           (b.Clicks*100.0/a.TotalSearchesMarch) AS CTRPercentageMarch,
+           (b.Installs*100.0/a.TotalSearchesMarch) AS ConversionPercentageMarch
+    FROM SearchesMarch AS a
+    INNER JOIN
+        TotalCLicksAndInstallsMarch AS b
+        ON //a.Market == b.Market AND 
+           a.SearchTerm == b.SearchTerm
+            AND a.ProductId == b.ProductId;
+
+BaseDataApril =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataApril
+    )
+    WHERE SearchTerm IN ("whatsapp","roblox","discord","msi center","minecraft","zoom")
+    AND SlotNumber == 0
+;
+
+SearchesApril =
+    SELECT //Market,
+           SearchTerm,
+           ProductId,
+           //AVG(SlotNumber) AS ACPApril,
+           COUNT(DISTINCT CVRoot) AS TotalSearchesApril
+    FROM BaseDataApril
+   // WHERE SearchTerm IN ("whatsapp","ro","r","w","wh","wha","what","whats","min","game pass","rob","t","roblo","hp","sea","tr","sky","youtube music","stumble guys","gamepass","whatsa","jw","hill","bilibili","b","msi","calendar","alexa","robl","jio","share","cricut","atomic heart","radio","watsapp","fall guys","ë¡œë¸”ë¡ìŠ¤","cooking","whats app","transl","plants vs zombies","angry","microsoft powertoys","wolong","msi center","watsap","wei","defender","hot","cro","taskbarx","whatapp","temple run","cross","ubu","hello neighbor");
+;
+
+SearchClicksAndInstallsApril = SELECT //Market, 
+                                        SearchTerm, 
+                                        ProductId,
+                                      CVRoot,
+                            Math.Min(1,COUNT(*)) AS Clicks,
+                            //COUNT (DISTINCT CVRoot) AS Clicks,
+                            //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                          FROM BaseDataApril
+                          //WHERE IsClicked == 1;
+                               WHERE IsClicked == true;
+
+TotalCLicksAndInstallsApril = 
+ SELECT //Market,
+        SearchTerm,
+        ProductId,
+        SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+        FROM SearchClicksAndInstallsApril;
+
+AprilData =
+    SELECT a.*,
+           b.Clicks AS AprilClicks,
+           b.Installs AS AprilInstalls,
+           (b.Clicks*100.0/a.TotalSearchesApril) AS CTRPercentageApril,
+           (b.Installs*100.0/a.TotalSearchesApril) AS ConversionPercentageApril
+    FROM SearchesApril AS a
+    INNER JOIN
+        TotalCLicksAndInstallsApril AS b
+        ON //a.Market == b.Market AND 
+            a.SearchTerm == b.SearchTerm
+            AND a.ProductId == b.ProductId
+;
+
+ComparisonStream =
+    SELECT a.*,
+           b.*.Except( SearchTerm, ProductId),
+           c.*.Except( SearchTerm, ProductId),
+           d.*.Except( SearchTerm, ProductId)
+    FROM AprilData AS a
+    LEFT JOIN FebData AS b
+              ON a.SearchTerm == b.SearchTerm
+                AND a.ProductId == b.ProductId
+    LEFT JOIN MarchData AS c
+              ON a.SearchTerm == c.SearchTerm
+                AND a.ProductId == c.ProductId
+    LEFT JOIN JanData AS d ON //a.Market == b.Market AND 
+                a.SearchTerm == d.SearchTerm
+            AND a.ProductId == d.ProductId
+                         //     WHERE b.TotalSearchesApril >= 100
+                              ;
+
+OUTPUT ComparisonStream TO SSTREAM @outputComparisonStream3
+CLUSTERED BY SearchTerm, ProductId
+SORTED BY TotalSearchesApril DESC, AprilInstalls DESC, AprilClicks DESC;

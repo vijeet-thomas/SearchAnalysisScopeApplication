@@ -42,17 +42,22 @@ MODULE "/shares/asimov.prod.data/Public/Resources/Latest/Dimensions/CommonDimens
 
 // Streams and Views
 RatingsStream = SSTREAM @"/shares/asimov.prod.data/PublicPartner/Processed/DSXRatings/prod/cooked/dataForPartners/V2/RatingsSummaryWithDeviceFamily/All/RatingsSummaryWithDeviceFamily.ss";
-#DECLARE inputStream string = @"/users/vijeetthomas/Search/RelevanceScore/2022/07/AggregatedScore_2022_07_30.ss";
+#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/11/AggregatedScoreFraud_2022_11_26.ss";
+#DECLARE inputStream2 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/12/AggregatedScoreFraud_2022_12_15.ss";
+#DECLARE nameStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
+RatingsStream2 = SSTREAM @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/2022/11/AndroidRatings_2022_11_23.ss";
 // --------------------------------------------------------------------------------------------------------------------
 
 
 Ratings =
-    SELECT *
-    FROM RatingsStream
+    SELECT *.Except(RatingsCount),
+           RatingsCount AS RatingCount
+    FROM RatingsStream2
     WHERE !string.IsNullOrWhiteSpace(ProductId)
-          AND !string.IsNullOrWhiteSpace(Market)
-          AND (!string.IsNullOrEmpty(DeviceFamily) && DeviceFamily.ToLowerInvariant() == "all")
-          AND Market=="US";
+//          AND !string.IsNullOrWhiteSpace(Market)
+//          AND (!string.IsNullOrEmpty(DeviceFamily) && DeviceFamily.ToLowerInvariant() == "all")
+          //AND Market=="US"
+;
 
 //dimVideoProductsUpdated = 
 //    SELECT *
@@ -74,45 +79,89 @@ Ratings =
 //    ;
 
 filteredStream =
-    SELECT ProductId, Market
+    SELECT ProductId, 
+           // ProductName
+           Market,
+           AggregateScore AS OldAggregateScore
     FROM
     (
         SSTREAM @inputStream
-    )
-    WHERE Market == "US";
+    );
+
+filteredStream2 =
+    SELECT ProductId, 
+           // ProductName
+           Market,
+           AggregateScore AS NewAggregateScore
+    FROM
+    (
+        SSTREAM @inputStream2
+    );
 
 filteredRatings =
-    SELECT r.*.Except(RatingCount),
-           ((r.RatingCount == null) ? 0 : r.RatingCount) AS RatingCount
+    SELECT //f.ProductName,
+            r.*,
+            f.OldAggregateScore,
+            f2.NewAggregateScore
     FROM filteredStream AS f
-    LEFT JOIN
+    INNER JOIN
         Ratings AS r
-        ON r.ProductId == f.ProductId AND r.Market == f.Market;
+        ON r.ProductId == f.ProductId AND r.Market == f.Market
+    INNER JOIN
+    filteredStream2 AS f2
+    ON f2.ProductId == f.ProductId AND f2.Market == f.Market
+        ;
+
+RatingsMinMax = 
+    SELECT MAX(RatingCount) AS MaxRatingCount, 
+           MIN(RatingCount) AS MinRatingCount,
+           AVG(RatingCount) AS AvgRatingCount
+           FROM  filteredRatings;
 
 videosSummary =
     SELECT *,
            (RatingCount == 0? 1 : 0) AS RatingCountZero,
-           (RatingCount <= 5 && RatingCount > 0 ? 1 : 0) AS RatingCountLessThan5,
            (RatingCount <= 10 && RatingCount > 5 ? 1 : 0) AS RatingCountLessThan10,
            (RatingCount <= 20 && RatingCount > 10 ? 1 : 0) AS RatingCountLessThan20,
-           (RatingCount <= 30 && RatingCount > 20? 1 : 0) AS RatingCountLessThan30,
-           (RatingCount <= 40 && RatingCount > 30? 1 : 0) AS RatingCountLessThan40,
            (RatingCount <= 50 && RatingCount > 40? 1 : 0) AS RatingCountLessThan50,
-           (RatingCount <= 100 && RatingCount > 50? 1 : 0) AS RatingCountGreaterThan100
-    FROM filteredRatings;
+           (RatingCount <= 100 && RatingCount > 50? 1 : 0) AS RatingCountLessThan100,
+           (RatingCount <= 500 && RatingCount > 100? 1 : 0) AS RatingCountLessThan500,
+           (RatingCount <= 1000 && RatingCount > 500? 1 : 0) AS RatingCountLessThan1000,
+           (RatingCount <= 2000 && RatingCount > 1000? 1 : 0) AS RatingCountLessThan2000,
+           (RatingCount <= 5000 && RatingCount > 2000? 1 : 0) AS RatingCountLessThan5000,
+           (RatingCount <= 10000 && RatingCount > 5000? 1 : 0) AS RatingCountLessThan10000,
+           (RatingCount > 1000? 1 : 0) AS RatingCountGreaterThan10000
+    FROM Ratings;
 
 videosSummary = 
     SELECT SUM(RatingCountZero) AS RatingCountZero,
-           SUM(RatingCountLessThan5) AS RatingCountLessThan5,
            SUM(RatingCountLessThan10) AS RatingCountLessThan10,
            SUM(RatingCountLessThan20) AS RatingCountLessThan20,
-           SUM(RatingCountLessThan30) AS RatingCountLessThan30,
-           SUM(RatingCountLessThan40) AS RatingCountLessThan40,
            SUM(RatingCountLessThan50) AS RatingCountLessThan50,
-           SUM(RatingCountGreaterThan100) AS RatingCountGreaterThan100
-    FROM videosSummary;
+           SUM(RatingCountLessThan100) AS RatingCountLessThan100,
+           SUM(RatingCountLessThan500) AS RatingCountLessThan500,
+           SUM(RatingCountLessThan1000) AS RatingCountLessThan1000,
+           SUM(RatingCountLessThan2000) AS RatingCountLessThan2000,
+           SUM(RatingCountLessThan5000) AS RatingCountLessThan5000,
+           SUM(RatingCountLessThan10000) AS RatingCountLessThan10000,
+           SUM(RatingCountGreaterThan10000) AS RatingCountGreaterThan10000,
+           MaxRatingCount,
+           MinRatingCount,
+           AvgRatingCount
+    FROM videosSummary CROSS JOIN RatingsMinMax;
 
-OUTPUT videosSummary TO SSTREAM @"/users/vijeetthomas/search/Analysis/RatingsAnalysisTV.ss";
+OUTPUT videosSummary TO SSTREAM @"/users/vijeetthomas/search/Analysis/AndroidRatingsAnalysis.ss";
+
+Names =
+    SELECT ProductId, ProductName
+    FROM (SSTREAM @nameStream)
+    WHERE !string.IsNullOrWhiteSpace(ProductId);
+
+productStream = SELECT DISTINCT f.*,n.ProductName FROM filteredRatings AS f LEFT JOIN Names AS n ON f.ProductId == n.ProductId;
+
+OUTPUT productStream TO SSTREAM @"/users/vijeetthomas/search/Analysis/AndroidRatingsProducts.ss"
+CLUSTERED BY ProductId, Market
+SORTED BY RatingCount DESC;
 /*
     LEFT JOIN modernAppAndGameProducts AS a
         ON p.ProductId == a.ProductId

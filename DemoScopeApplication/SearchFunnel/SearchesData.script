@@ -1,0 +1,168 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:1f98625b-2d73-41a6-892d-9502a3053c7f
+// Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 4), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchFunnel/";
+#DECLARE inputSource string  = string.Format("{0}/BaseData_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputAllSearchData string  = string.Format("{0}/SearchData_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputUSSearchData string  = string.Format("{0}/SearchDataUS_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputZeroSearchData string  = string.Format("{0}/ZeroResultsSearches_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputZeroUSSearchData string  = string.Format("{0}/ZeroResultsUSSearches_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+
+BaseDataDaily =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputSource
+    );
+
+SearchesDaily =
+    SELECT Market,
+           SearchTerm,
+           SearchType,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseDataDaily;
+
+SearchesDaily =
+    SELECT SUM(TotalSearches) AS TotalSearches
+    FROM SearchesDaily;
+
+SearchesASDaily =
+    SELECT Market,
+           SearchTerm,
+           COUNT(DISTINCT PageImpressionGuid) AS AutosuggestSearches
+    FROM BaseDataDaily
+    WHERE SearchType == "Autosuggest";
+
+SearchesASDaily =
+    SELECT SUM(AutosuggestSearches) AS AutosuggestSearches
+    FROM SearchesASDaily;
+
+SearchesRegularDaily =
+    SELECT Market,
+           SearchTerm,
+           COUNT(DISTINCT PageImpressionGuid) AS RegularSearches
+    FROM BaseDataDaily
+    WHERE SearchType == "Regular";
+
+SearchesRegularDaily =
+    SELECT SUM(RegularSearches) AS RegularSearches
+    FROM SearchesRegularDaily;
+
+SearchesZeroDaily =
+    SELECT Market,
+           SearchTerm,
+           COUNT(DISTINCT PageImpressionGuid) AS ZeroSearches
+    FROM BaseDataDaily
+    WHERE ContentSource == "ZeroResult";
+
+SearchtermsZeroDaily =
+    SELECT SearchTerm,
+           SUM(ZeroSearches) AS ZeroSearches
+    FROM SearchesZeroDaily;
+
+SearchesZeroDaily =
+    SELECT SUM(ZeroSearches) AS ZeroSearches
+    FROM SearchesZeroDaily;
+
+SearchesAgg =
+    SELECT TotalSearches,
+           AutosuggestSearches,
+           RegularSearches,
+           ZeroSearches,
+           (ZeroSearches*100.0/TotalSearches) AS ZeroSearchesPercentage
+    FROM SearchesDaily AS a
+    CROSS JOIN
+        SearchesASDaily AS b
+        //ON a.Market == b.Market
+    CROSS JOIN
+        SearchesRegularDaily AS c
+        //ON a.Market == c.Market
+    CROSS JOIN
+        SearchesZeroDaily AS d
+        //ON a.Market == d.Market;
+        ;
+
+SearchesDailyUS =
+    SELECT SearchTerm,
+           SearchType,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseDataDaily
+    WHERE Market == "US";
+
+SearchesDailyUS =
+    SELECT SUM(TotalSearches) AS TotalSearches
+    FROM SearchesDailyUS;
+
+SearchesASDailyUS =
+    SELECT SearchTerm,
+           COUNT(DISTINCT PageImpressionGuid) AS AutosuggestSearches
+    FROM BaseDataDaily
+    WHERE SearchType == "Autosuggest"
+            AND Market == "US";
+
+SearchesASDailyUS =
+    SELECT SUM(AutosuggestSearches) AS AutosuggestSearches
+    FROM SearchesASDailyUS;
+
+SearchesRegularDailyUS =
+    SELECT SearchTerm,
+           COUNT(DISTINCT PageImpressionGuid) AS RegularSearches
+    FROM BaseDataDaily
+    WHERE SearchType == "Regular"
+    AND Market == "US";
+
+SearchesRegularDailyUS =
+    SELECT SUM(RegularSearches) AS RegularSearches
+    FROM SearchesRegularDailyUS;
+
+SearchesZeroDailyUS =
+    SELECT SearchTerm,
+           COUNT(DISTINCT PageImpressionGuid) AS ZeroSearches
+    FROM BaseDataDaily
+    WHERE ContentSource == "ZeroResult"
+    AND Market == "US";
+
+SearchtermsZeroDailyUS =
+    SELECT SearchTerm,
+           SUM(ZeroSearches) AS ZeroSearches
+    FROM SearchesZeroDailyUS;
+
+SearchesZeroDailyUS =
+    SELECT SUM(ZeroSearches) AS ZeroSearches
+    FROM SearchesZeroDailyUS;
+
+SearchesAggUS =
+    SELECT //a.Market,
+           TotalSearches,
+           AutosuggestSearches,
+           RegularSearches,
+           ZeroSearches,
+           (ZeroSearches*100.0/TotalSearches) AS ZeroSearchesPercentage
+    FROM SearchesDailyUS AS a
+    CROSS JOIN
+        SearchesASDailyUS AS b
+        //ON a.Market == b.Market
+    CROSS JOIN
+        SearchesRegularDailyUS AS c
+        //ON a.Market == c.Market
+    CROSS JOIN
+        SearchesZeroDailyUS AS d
+        //ON a.Market == d.Market
+;
+
+OUTPUT SearchesAgg TO SSTREAM @outputAllSearchData ;
+OUTPUT SearchesAggUS TO SSTREAM @outputUSSearchData;
+
+OUTPUT SearchtermsZeroDaily
+TO SSTREAM @outputZeroSearchData
+CLUSTERED BY SearchTerm
+SORTED BY ZeroSearches DESC;
+
+OUTPUT SearchtermsZeroDailyUS
+TO SSTREAM @outputZeroUSSearchData
+CLUSTERED BY SearchTerm
+SORTED BY ZeroSearches DESC;

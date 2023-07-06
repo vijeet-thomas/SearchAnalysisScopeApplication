@@ -1,0 +1,36 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:44a91972-3d51-44ad-a5ee-7bbb8718be92
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate;
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+#DECLARE lastMonth DateTime = @endDate.AddMonths( - 1);
+#DECLARE lastMonthString string = @lastMonth.ToString("yyyyMM");
+#DECLARE rootFolder string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/SearchMetrics/SearchFunnel";
+
+searchProductsDaily =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    )
+;
+
+searchData =
+    SELECT *
+    FROM searchProductsDaily
+    WHERE
+    //IsTest != 1 AND 
+    (SearchType == "Regular" OR SearchType == "Autosuggest")
+    AND IsFinalSearch == true
+    AND DeviceClass == "Windows.Desktop"
+    AND SearchTerm.Length > 0
+    AND SlotNumber >= 0
+    AND ContentSource == "ZeroResult";
+
+OUTPUT searchData
+TO SSTREAM @"/users/vijeetthomas/experimentalData.ss";

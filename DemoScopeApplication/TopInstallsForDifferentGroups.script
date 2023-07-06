@@ -4,7 +4,7 @@
 //Script GUID:8ca6bec9-7e3e-4483-9a51-0f877b295d47
 //Used for tracking history
 
-#DECLARE aggregateScoreStream1 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore5_2022_08_19.ss"; 
+#DECLARE aggregateScoreStream1 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/12/AggregatedScore_2022_12_26.ss";
 #DECLARE streamExpiryString string = "180";
 #DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
 
@@ -37,8 +37,6 @@ aggScore1 =
     FROM aggScore
     WHERE Market == "US"
     AND !(ProductTypeName.Equals("TV Series") || ProductTypeName.Equals("Movie"))
-    AND MadCount IS NOT NULL
-    ORDER BY MadCount DESC
 ;
 
 //aggScore2 =
@@ -70,7 +68,7 @@ aggScore3 =
 //    ORDER BY InstallsCount DESC
 //;
 
-OUTPUT aggScore1 TO SSTREAM @"/users/vijeetthomas/TopApps/TopMadAppsAndGames.ss" CLUSTERED BY ProductId SORTED BY MadCount DESC;
+OUTPUT aggScore1 TO SSTREAM @"/users/vijeetthomas/TopApps/TopMadAppsAndGames.ss" CLUSTERED BY ProductId SORTED BY AggregateScore DESC;
 //OUTPUT aggScore2 TO SSTREAM @"/users/vijeetthomas/TopInstalls/TopInstallsWin32.ss" CLUSTERED BY ProductId SORTED BY Win32Installs DESC;
 OUTPUT aggScore3 TO SSTREAM @"/users/vijeetthomas/TopApps/TopScoresVideos.ss" CLUSTERED BY ProductId SORTED BY AggregateScore DESC;
 //OUTPUT aggScore4 TO SSTREAM @"/users/vijeetthomas/TopInstalls/TopInstallsOther.ss" CLUSTERED BY ProductId SORTED BY InstallsCount DESC;

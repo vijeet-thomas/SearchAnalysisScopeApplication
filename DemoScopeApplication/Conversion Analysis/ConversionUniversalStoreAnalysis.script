@@ -1,0 +1,99 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:b4a0b2eb-080f-48d6-9230-a6d12378871b
+// Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -2), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate DateTime = @endDate.AddDays(-60);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+#DECLARE outputRoot string = @"users/vijeetthomas/PageImpressionConversion/UniversalStore/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/ConversionAnalysis.ss", @outputRoot);
+#DECLARE outputStreamPerSearch2 string = string.Format("{0}/ConversionAnalysisAlternate.ss", @outputRoot);
+#DECLARE streamExpiryString string = "60";
+#DECLARE SearchProductView string = @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view";
+
+inputData =
+    VIEW @SearchProductView 
+    PARAMS 
+    (
+        startDate = @startDateString,
+        endDate = @endDateString
+    );
+
+BaseDataDaily =
+    SELECT *
+    FROM inputData
+    WHERE 
+          IsTest!= 1  
+          AND (SearchType == "Regular" OR SearchType == "Autosuggest")
+          AND IsFinalSearch == true
+          AND SlotNumber >= 0 
+          AND !string.IsNullOrEmpty(SearchTerm)
+    ;
+
+SearchesDaily =
+    SELECT DateId,
+           COUNT(DISTINCT PageImpressionGuid  ) AS Searches
+    FROM BaseDataDaily;
+
+ClicksDaily = 
+    SELECT  DateId,
+            COUNT(DISTINCT PageImpressionGuid  ) AS Clicks
+    FROM BaseDataDaily
+    WHERE IsClicked == true;
+
+InstallsDaily =
+    SELECT DateId,
+           COUNT(DISTINCT PageImpressionGuid) AS Installs
+    FROM BaseDataDaily
+    WHERE (StartedPurchaseFlow_Free > 0 OR StartedPurchaseFlow_Paid > 0 OR StartedPurchaseFlow_Trial > 0 OR AttemptedInstalls > 0);
+
+SearchSummary = 
+    SELECT a.*,
+           b.Clicks,
+           c.Installs
+    FROM SearchesDaily AS a INNER JOIN ClicksDaily AS b ON a.DateId == b.DateId INNER JOIN InstallsDaily AS c ON a.DateId == c.DateId;
+
+SearchSummary =
+    SELECT *,
+           Clicks * 100.0 / Searches AS CTR,
+           Installs * 100.0 / Searches AS Conversion
+    FROM SearchSummary;
+
+OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch
+CLUSTERED BY DateId
+SORTED BY DateId DESC;
+
+SearchesDaily2 =
+    SELECT DateId,
+           COUNT(DISTINCT PageImpressionGuid ) AS Searches
+    FROM BaseDataDaily;
+
+ClicksDaily2 = 
+    SELECT  DateId,
+            COUNT (DISTINCT PageImpressionGuid ) AS Clicks
+    FROM BaseDataDaily
+         WHERE IsClicked == true;
+    ;
+
+InstallsDaily2 =
+    SELECT DateId,
+           (SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+    FROM BaseDataDaily;
+    
+
+SearchSummary2 = 
+    SELECT a.*,
+           b.Clicks,
+           c.Installs
+    FROM SearchesDaily2 AS a INNER JOIN ClicksDaily2 AS b ON a.DateId == b.DateId INNER JOIN InstallsDaily2 AS c ON a.DateId == c.DateId;
+
+SearchSummary2 =
+    SELECT *,
+           Clicks * 100.0 / Searches AS CTR,
+           Installs * 100.0 / Searches AS Conversion
+    FROM SearchSummary2;
+
+OUTPUT SearchSummary2 TO SSTREAM @outputStreamPerSearch2
+CLUSTERED BY DateId
+SORTED BY DateId DESC;

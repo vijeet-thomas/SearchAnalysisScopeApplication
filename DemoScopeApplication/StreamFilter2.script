@@ -4,64 +4,82 @@
 //Script GUID:03c2bf3d-a016-4ca9-b588-d375e1de0773
 //Used for tracking history
 
-#DECLARE inputStream1 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_06.ss";
-#DECLARE inputStream2 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_20.ss";
-#DECLARE inputStream3 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore5_2022_08_19.ss";
-#DECLARE inputStream4 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore7_2022_08_19.ss";
+#DECLARE inputStream1 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/08/AggregatedScore_2022_08_23.ss";
+#DECLARE inputStream2 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/10/AggregatedScore_2022_10_30.ss";
+#DECLARE inputStream3 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/10/AggregatedScoreWithoutFraud_2022_10_11.ss";
+//#DECLARE inputStream4 string = @"/users/vijeetthomas/Search/RelevanceScore/2022/08/AggregatedScore7_2022_08_19.ss";
 
 filteredStream1 =
-    SELECT ProductId, Market, AggregateScore
+    SELECT ProductId,
+           Market,
+           AggregateScore
     FROM
     (
         SSTREAM @inputStream1
     )
-    WHERE Market == "US"
-    AND ProductId IN ("9P3CP9G025RM","9N2F0P0166HF","9WZDNCRFHWQT","9P2HTZQ722V3","9NBLGGH67WLK","9WZDNCRDJXP4","XPFCG5NRKXQPKT","XPDF9VL4D5XR9W","XPDNZD76FP5JR7","9P9F6DZJBBLJ","9P4TCNS9H432","9NBLGGH4THTC","9NNKG5W1KS5W","9N8K6FK85SC5","9PJNRDBCJ62L","9NGV3RRB3ZK2","9N29TP7ZMKV3","9MTV0K1RK7JV","9MWDP4QTXDXH","XPDP273C0XHQH2");
+                    //AND ProductId IN ("9PGLJM0HRGNF","9NMMGP31QN5C","9PHPQ83TVSHB","9N7G03KQCLXG","9NQ8HS91Z5F5","9MSVDPX78RT5","9PB36SK3SCCN","9PNJXVCVWD4K","9NXP44L49SHJ","9PN2D5990ZXL","9NG5S6HW7PJ1","9NMMJQWN0BVT","9MTWCD8H4F5P","9PJPW5LDXLZ5","9MZTN677FHZP","9N70XJNJ3JHG","9N6HWT87WGM0","9P8CP1L72JXS","9P48LTH65C7Q","9PN81BJPG9LG","9NB2JC29PT56","9PJJL7FKTFP5","9NC23L76XH3D","9N71GCF0VZ5W","9N2VW3MDWCDT","9NLCNS1KDCX6","9NXLG3F7ZXCZ","9PNQ74WV54QW","9NQ5D7MGJB8N","9PN81VLPJW9K","9NLW64PZ9GF6","9NHCGQZL7NMV","9N290LL4NLVR","9NF8Q6WS9FHF","9PKFBJ2G4H5Z","9P694HC4BKF2","9NS4R5ZZQ9J1","9NT22L1286Q7","9PC5VGZ1XTND","9N83XN7V7ZBC","9N2K84VMHF8B","9NKXQQMZGPHP","9NH2GPH4JZS4");
+                    ;
+
+//    WHERE Market == "US"
+//    AND ProductId IN ("9P3CP9G025RM","9N2F0P0166HF","9WZDNCRFHWQT","9P2HTZQ722V3","9NBLGGH67WLK","9WZDNCRDJXP4","XPFCG5NRKXQPKT","XPDF9VL4D5XR9W","XPDNZD76FP5JR7","9P9F6DZJBBLJ","9P4TCNS9H432","9NBLGGH4THTC","9NNKG5W1KS5W","9N8K6FK85SC5","9PJNRDBCJ62L","9NGV3RRB3ZK2","9N29TP7ZMKV3","9MTV0K1RK7JV","9MWDP4QTXDXH","XPDP273C0XHQH2");
 
 filteredStream2 =
-    SELECT ProductId, Market, AggregateScore
+    SELECT ProductId,
+           Market,
+           AggregateScore,
+           FraudPercentageAG,
+           GoodRatingPercentageAG
     FROM
     (
         SSTREAM @inputStream2
     )
-    WHERE Market == "US"
-    AND ProductId IN ("9P3CP9G025RM","9N2F0P0166HF","9WZDNCRFHWQT","9P2HTZQ722V3","9NBLGGH67WLK","9WZDNCRDJXP4","XPFCG5NRKXQPKT","XPDF9VL4D5XR9W","XPDNZD76FP5JR7","9P9F6DZJBBLJ","9P4TCNS9H432","9NBLGGH4THTC","9NNKG5W1KS5W","9N8K6FK85SC5","9PJNRDBCJ62L","9NGV3RRB3ZK2","9N29TP7ZMKV3","9MTV0K1RK7JV","9MWDP4QTXDXH","XPDP273C0XHQH2");
+    WHERE  FraudPercentageAG >= 10
+          AND TotalCount >= 1000;
+
+//    WHERE Market == "US"
+//    AND ProductId IN ("9P3CP9G025RM","9N2F0P0166HF","9WZDNCRFHWQT","9P2HTZQ722V3","9NBLGGH67WLK","9WZDNCRDJXP4","XPFCG5NRKXQPKT","XPDF9VL4D5XR9W","XPDNZD76FP5JR7","9P9F6DZJBBLJ","9P4TCNS9H432","9NBLGGH4THTC","9NNKG5W1KS5W","9N8K6FK85SC5","9PJNRDBCJ62L","9NGV3RRB3ZK2","9N29TP7ZMKV3","9MTV0K1RK7JV","9MWDP4QTXDXH","XPDP273C0XHQH2");
 
 filteredStream3 =
-    SELECT ProductId, Market, AggregateScore
+    SELECT ProductId,
+           Market,
+           AggregateScore
     FROM
     (
         SSTREAM @inputStream3
     )
-    WHERE Market == "US"
-    AND ProductId IN ("9P3CP9G025RM","9N2F0P0166HF","9WZDNCRFHWQT","9P2HTZQ722V3","9NBLGGH67WLK","9WZDNCRDJXP4","XPFCG5NRKXQPKT","XPDF9VL4D5XR9W","XPDNZD76FP5JR7","9P9F6DZJBBLJ","9P4TCNS9H432","9NBLGGH4THTC","9NNKG5W1KS5W","9N8K6FK85SC5","9PJNRDBCJ62L","9NGV3RRB3ZK2","9N29TP7ZMKV3","9MTV0K1RK7JV","9MWDP4QTXDXH","XPDP273C0XHQH2");
+                    //    AND ProductId IN ("9PGLJM0HRGNF","9NMMGP31QN5C","9PHPQ83TVSHB","9N7G03KQCLXG","9NQ8HS91Z5F5","9MSVDPX78RT5","9PB36SK3SCCN","9PNJXVCVWD4K","9NXP44L49SHJ","9PN2D5990ZXL","9NG5S6HW7PJ1","9NMMJQWN0BVT","9MTWCD8H4F5P","9PJPW5LDXLZ5","9MZTN677FHZP","9N70XJNJ3JHG","9N6HWT87WGM0","9P8CP1L72JXS","9P48LTH65C7Q","9PN81BJPG9LG","9NB2JC29PT56","9PJJL7FKTFP5","9NC23L76XH3D","9N71GCF0VZ5W","9N2VW3MDWCDT","9NLCNS1KDCX6","9NXLG3F7ZXCZ","9PNQ74WV54QW","9NQ5D7MGJB8N","9PN81VLPJW9K","9NLW64PZ9GF6","9NHCGQZL7NMV","9N290LL4NLVR","9NF8Q6WS9FHF","9PKFBJ2G4H5Z","9P694HC4BKF2","9NS4R5ZZQ9J1","9NT22L1286Q7","9PC5VGZ1XTND","9N83XN7V7ZBC","9N2K84VMHF8B","9NKXQQMZGPHP","9NH2GPH4JZS4");
+                    ;
+//    WHERE Market == "US"
+//    AND ProductId IN ("9P3CP9G025RM","9N2F0P0166HF","9WZDNCRFHWQT","9P2HTZQ722V3","9NBLGGH67WLK","9WZDNCRDJXP4","XPFCG5NRKXQPKT","XPDF9VL4D5XR9W","XPDNZD76FP5JR7","9P9F6DZJBBLJ","9P4TCNS9H432","9NBLGGH4THTC","9NNKG5W1KS5W","9N8K6FK85SC5","9PJNRDBCJ62L","9NGV3RRB3ZK2","9N29TP7ZMKV3","9MTV0K1RK7JV","9MWDP4QTXDXH","XPDP273C0XHQH2");
 
-filteredStream4 =
-    SELECT ProductId, Market, AggregateScore
-    FROM
-    (
-        SSTREAM @inputStream4
-    )
-    WHERE Market == "US"
-    AND ProductId IN ("9P3CP9G025RM","9N2F0P0166HF","9WZDNCRFHWQT","9P2HTZQ722V3","9NBLGGH67WLK","9WZDNCRDJXP4","XPFCG5NRKXQPKT","XPDF9VL4D5XR9W","XPDNZD76FP5JR7","9P9F6DZJBBLJ","9P4TCNS9H432","9NBLGGH4THTC","9NNKG5W1KS5W","9N8K6FK85SC5","9PJNRDBCJ62L","9NGV3RRB3ZK2","9N29TP7ZMKV3","9MTV0K1RK7JV","9MWDP4QTXDXH","XPDP273C0XHQH2");
+//filteredStream4 =
+//    SELECT ProductId, Market, AggregateScore
+//    FROM
+//    (
+//        SSTREAM @inputStream4
+//    )
+//    WHERE Market == "US"
+//    AND ProductId IN ("9P3CP9G025RM","9N2F0P0166HF","9WZDNCRFHWQT","9P2HTZQ722V3","9NBLGGH67WLK","9WZDNCRDJXP4","XPFCG5NRKXQPKT","XPDF9VL4D5XR9W","XPDNZD76FP5JR7","9P9F6DZJBBLJ","9P4TCNS9H432","9NBLGGH4THTC","9NNKG5W1KS5W","9N8K6FK85SC5","9PJNRDBCJ62L","9NGV3RRB3ZK2","9N29TP7ZMKV3","9MTV0K1RK7JV","9MWDP4QTXDXH","XPDP273C0XHQH2");
 
 streamCompare =
     SELECT a.ProductId,
            a.Market,
+           b.FraudPercentageAG,
+           b.GoodRatingPercentageAG,
            a.AggregateScore AS OldScore,
-           b.AggregateScore AS NewScore3Installs,
-           c.AggregateScore AS NewScoreRatingCountIncluded,
-           d.AggregateScore AS NewScore5Installs
+           b.AggregateScore AS NewScoreWithFraud,
+           c.AggregateScore AS NewScoreWithoutFraud
+           //d.AggregateScore AS NewScore5Installs
     FROM filteredStream1 AS a
          INNER JOIN
              filteredStream2 AS b
          ON a.ProductId == b.ProductId AND a.Market == b.Market
          INNER JOIN
              filteredStream3 AS c
-         ON a.ProductId == c.ProductId AND a.Market == c.Market
-         INNER JOIN
-             filteredStream4 AS d
-         ON a.ProductId == d.ProductId AND a.Market == d.Market;
+         ON a.ProductId == c.ProductId AND a.Market == c.Market;
+//         INNER JOIN
+//             filteredStream4 AS d
+//         ON a.ProductId == d.ProductId AND a.Market == d.Market;
 
 #DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
 
@@ -75,12 +93,12 @@ FROM
 streamCompare = 
     SELECT a.*, b.ProductName
     FROM streamCompare AS a 
-         LEFT JOIN productNames AS b
+         INNER JOIN productNames AS b
          ON a.ProductId == b.ProductId
     WHERE a.ProductId IS NOT NULL;
 
 
 OUTPUT streamCompare
-TO SSTREAM "/users/vijeetthomas/RelevanceScore/RnRAllApps/2022/08/AggregatedScoreFilteredCompare_2022_08_20.ss"
+TO SSTREAM "/users/vijeetthomas/FraudAnalysis/AggregatedScoreFilteredCompare_2022_10_30.ss"
 CLUSTERED BY ProductId
-SORTED BY ProductId;
+SORTED BY FraudPercentageAG DESC;

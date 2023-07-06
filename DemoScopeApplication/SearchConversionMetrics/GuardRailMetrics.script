@@ -1,0 +1,97 @@
+﻿//Script GUID:50c88c2b-5ee8-4afb-b450-4a73e1cfdaa6
+//Used for tracking history
+
+#DECLARE endDate DateTime = DateTime.Parse(@"2023-03-31T00:00:00");
+#DECLARE startDate DateTime = DateTime.Parse(@"2023-03-01T00:00:00");
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+
+// This view will be used to get searches
+searchProducts =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate = @startDateString,
+        endDate = @endDateString
+    )
+;
+
+BaseData =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           PageImpressionGuid,
+           ContentSource,
+           CVFull.Split('.')[0] AS CVRoot,
+           UserIdFull.ToLower() AS UserIdFull,
+           AttemptedInstalls IS NULL ? 0 : AttemptedInstalls AS AttemptedInstalls,
+           StartedPurchaseFlow_Free IS NULL ? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+           StartedPurchaseFlow_Paid IS NULL ? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+           StartedPurchaseFlow_Trial IS NULL ? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial,
+           ResultingSuccessfulAcquisitions_Free IS NULL ? 0 : ResultingSuccessfulAcquisitions_Free AS ResultingSuccessfulAcquisitions_Free,
+           ResultingSuccessfulAcquisitions_Paid IS NULL ? 0 : ResultingSuccessfulAcquisitions_Paid AS ResultingSuccessfulAcquisitions_Paid,
+           ResultingSuccessfulAcquisitions_Trial IS NULL ? 0 : ResultingSuccessfulAcquisitions_Trial AS ResultingSuccessfulAcquisitions_Trial
+    FROM searchProducts
+    WHERE 
+          IsTest!= 1  
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SlotNumber >= 0;
+
+
+Searches =
+    SELECT SearchTerm,
+           COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM BaseData;
+
+
+SearchClicksAndInstalls = SELECT SearchTerm, CVRoot, ProductId,
+                            COUNT(DISTINCT CVRoot) AS Clicks,
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                          FROM BaseData
+                          WHERE IsClicked == true;
+
+
+SearchInstalls = SELECT SearchTerm, CVRoot, ProductId,
+                        Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                        FROM BaseData;
+
+
+TotalClicksAndInstalls =
+    SELECT SearchTerm,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstalls;
+
+
+// Search Count for current month
+SearchesAgg = 
+    SELECT a.*,
+           b.TotalClicks,
+           b.TotalInstalls,
+           RANK() OVER(ORDER BY a.TotalSearches DESC) AS RankBySearchCount
+    FROM Searches AS a LEFT JOIN TotalClicksAndInstalls AS b ON a.SearchTerm == b.SearchTerm;
+
+
+SearchesTotalClicksInstallsAndSearchCount =
+    SELECT *,
+           TotalInstalls * 100.0 / TotalClicks AS InstallsToClicksPercentage,
+           TotalInstalls * 100.0 / TotalSearches AS InstallsToSearchCountPercentage,
+           TotalClicks * 100.0 / TotalSearches AS ClicksToSearchCountPercentage
+    FROM SearchesAgg
+    WHERE RankBySearchCount <=10000;
+
+//FilteredMisspelledData =
+//    SELECT b.*
+//    FROM misspelledTerms AS a
+//         LEFT JOIN
+//             SearchesTotalClicksInstallsAndSearchCount AS b
+//         ON a.misspellings == b.SearchTerm;
+
+OUTPUT SearchesTotalClicksInstallsAndSearchCount
+TO SSTREAM @"/users/vijeetthomas/Top1k-SearchTermLevelData/April.ss";
+
+//OUTPUT misspelledTerms
+//TO SSTREAM @"/users/harshalshree/BingSpellCheck/Misspelled.ss";

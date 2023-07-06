@@ -1,0 +1,217 @@
+﻿//Script GUID:79fc422f-819e-4f92-b697-9ede6ca8e846
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate30Days DateTime = @endDate.AddDays(29);
+#DECLARE startDate7Days DateTime = @endDate.AddDays(6);
+#DECLARE startDate1Day DateTime = @endDate;
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate30DaysString string = @startDate30Days.ToString("yyyy-MM-dd");
+#DECLARE startDate7DaysString string = @startDate7Days.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+#DECLARE outputBusiness30Days string  = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/SearchMetrics/BusinessMetrics/30Days/BusinessMetricsLast30Days.ss";
+#DECLARE outputBusiness7Days string  = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/SearchMetrics/BusinessMetrics/7Days/BusinessMetricsLast7Days.ss";
+#DECLARE outputBusinessDaily string  = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/SearchMetrics/BusinessMetrics/Daily/BusinessMetricsDaily.ss";
+#DECLARE outputSearchesAgg30Days string  = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/SearchMetrics/BusinessMetrics/30Days/SearchesAgg30Days.ss";
+#DECLARE outputSearchesAgg7Days string  = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/SearchMetrics/BusinessMetrics/7Days/SearchesAgg7Days.ss";
+#DECLARE outputSearchesAggDaily string  = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/SearchMetrics/BusinessMetrics/Daily/SearchesAggDaily.ss";
+
+
+// This view will be used to get searches
+searchProducts30Days =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate = @startDate30DaysString,
+        endDate = @endDateString
+    )
+;
+
+searchProducts7Days =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate = @startDate7DaysString,
+        endDate = @endDateString
+    )
+;
+
+searchProductsDaily =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate = @startDate1DayString,
+        endDate = @endDateString
+    )
+;
+
+BaseData30Days =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           PageImpressionGuid,
+           UserIdFull.ToLower() AS UserIdFull,
+           AttemptedInstalls IS NULL? 0 : AttemptedInstalls AS AttemptedInstalls,
+           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial,
+           ResultingSuccessfulAcquisitions_Free IS NULL? 0 : ResultingSuccessfulAcquisitions_Free AS ResultingSuccessfulAcquisitions_Free,
+           ResultingSuccessfulAcquisitions_Paid IS NULL? 0 : ResultingSuccessfulAcquisitions_Paid AS ResultingSuccessfulAcquisitions_Paid,
+           ResultingSuccessfulAcquisitions_Trial IS NULL? 0 : ResultingSuccessfulAcquisitions_Trial AS ResultingSuccessfulAcquisitions_Trial
+    FROM searchProducts30Days
+    WHERE
+    IsTest != 1
+    AND SearchType == "Regular"
+    AND DeviceClass == "Windows.Desktop"
+    AND SlotNumber >= 0;
+
+BaseData7Days =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           PageImpressionGuid,
+           UserIdFull.ToLower() AS UserIdFull,
+           AttemptedInstalls IS NULL? 0 : AttemptedInstalls AS AttemptedInstalls,
+           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial,
+           ResultingSuccessfulAcquisitions_Free IS NULL? 0 : ResultingSuccessfulAcquisitions_Free AS ResultingSuccessfulAcquisitions_Free,
+           ResultingSuccessfulAcquisitions_Paid IS NULL? 0 : ResultingSuccessfulAcquisitions_Paid AS ResultingSuccessfulAcquisitions_Paid,
+           ResultingSuccessfulAcquisitions_Trial IS NULL? 0 : ResultingSuccessfulAcquisitions_Trial AS ResultingSuccessfulAcquisitions_Trial
+    FROM searchProducts7Days
+    WHERE
+    IsTest != 1
+    AND SearchType == "Regular"
+    AND DeviceClass == "Windows.Desktop"
+    AND SlotNumber >= 0;
+
+BaseDataDaily =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           PageImpressionGuid,
+           UserIdFull.ToLower() AS UserIdFull,
+           AttemptedInstalls IS NULL? 0 : AttemptedInstalls AS AttemptedInstalls,
+           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial,
+           ResultingSuccessfulAcquisitions_Free IS NULL? 0 : ResultingSuccessfulAcquisitions_Free AS ResultingSuccessfulAcquisitions_Free,
+           ResultingSuccessfulAcquisitions_Paid IS NULL? 0 : ResultingSuccessfulAcquisitions_Paid AS ResultingSuccessfulAcquisitions_Paid,
+           ResultingSuccessfulAcquisitions_Trial IS NULL? 0 : ResultingSuccessfulAcquisitions_Trial AS ResultingSuccessfulAcquisitions_Trial
+    FROM searchProductsDaily
+    WHERE
+    IsTest != 1
+    AND SearchType == "Regular"
+    AND DeviceClass == "Windows.Desktop"
+    AND SlotNumber >= 0;
+
+Searches30Days =
+    SELECT SearchTerm,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseData30Days;
+
+Searches7Days =
+    SELECT SearchTerm,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseData7Days;
+
+SearchesDaily =
+    SELECT SearchTerm,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
+    FROM BaseDataDaily;
+
+SearchClicksAndInstalls30Days = SELECT SearchTerm, PageImpressionGuid,
+                            Math.Min(1, COUNT(DISTINCT PageImpressionGuid)) AS Clicks,
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                          FROM BaseData30Days
+                          WHERE IsClicked == true;
+
+SearchClicksAndInstalls7Days = SELECT SearchTerm, PageImpressionGuid,
+                            Math.Min(1, COUNT(DISTINCT PageImpressionGuid)) AS Clicks,
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                          FROM BaseData7Days
+                          WHERE IsClicked == true;
+
+SearchClicksAndInstallsDaily = SELECT SearchTerm, PageImpressionGuid,
+                            Math.Min(1, COUNT(DISTINCT PageImpressionGuid)) AS Clicks,
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                          FROM BaseDataDaily
+                          WHERE IsClicked == true;
+
+TotalClicksAndInstalls30Days =
+    SELECT SearchTerm,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstalls30Days;
+
+TotalClicksAndInstalls7Days =
+    SELECT SearchTerm,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstalls7Days;
+
+TotalClicksAndInstallsDaily =
+    SELECT SearchTerm,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstallsDaily;
+
+SearchesAgg30Days = 
+    SELECT a.*,
+           b.TotalClicks,
+           b.TotalInstalls
+    FROM Searches30Days AS a LEFT JOIN TotalClicksAndInstalls30Days AS b ON a.SearchTerm == b.SearchTerm;
+
+SearchesAgg7Days = 
+    SELECT a.*,
+           b.TotalClicks,
+           b.TotalInstalls
+    FROM Searches7Days AS a LEFT JOIN TotalClicksAndInstalls7Days AS b ON a.SearchTerm == b.SearchTerm;
+
+SearchesAggDaily = 
+    SELECT a.*,
+           b.TotalClicks,
+           b.TotalInstalls
+    FROM SearchesDaily AS a LEFT JOIN TotalClicksAndInstallsDaily AS b ON a.SearchTerm == b.SearchTerm;
+
+BusinessMetricOverview30Days = 
+    SELECT SUM(TotalInstalls) * 100.0 / SUM(TotalSearches) AS ConversionPercentage,
+           SUM(TotalClicks) * 100.0 / SUM(TotalSearches) AS CTRPercentage
+    FROM SearchesAgg30Days;
+
+BusinessMetricOverview7Days = 
+    SELECT SUM(TotalInstalls) * 100.0 / SUM(TotalSearches) AS ConversionPercentage,
+           SUM(TotalClicks) * 100.0 / SUM(TotalSearches) AS CTRPercentage
+    FROM SearchesAgg7Days;
+
+BusinessMetricOverviewDaily = 
+    SELECT SUM(TotalInstalls) * 100.0 / SUM(TotalSearches) AS ConversionPercentage,
+           SUM(TotalClicks) * 100.0 / SUM(TotalSearches) AS CTRPercentage
+    FROM SearchesAggDaily;
+
+OUTPUT SearchesAgg30Days TO SSTREAM @outputSearchesAgg30Days
+  CLUSTERED BY SearchTerm
+        SORTED BY TotalSearches DESC, TotalClicks DESC, TotalInstalls DESC;
+
+OUTPUT SearchesAgg7Days TO SSTREAM @outputSearchesAgg7Days
+  CLUSTERED BY SearchTerm
+        SORTED BY TotalSearches DESC, TotalClicks DESC, TotalInstalls DESC;
+
+OUTPUT SearchesAggDaily TO SSTREAM @outputSearchesAggDaily
+  CLUSTERED BY SearchTerm
+        SORTED BY TotalSearches DESC, TotalClicks DESC, TotalInstalls DESC;
+
+OUTPUT BusinessMetricOverview30Days
+TO SSTREAM @outputBusiness30Days;
+
+OUTPUT BusinessMetricOverview7Days
+TO SSTREAM @outputBusiness7Days;
+
+OUTPUT BusinessMetricOverviewDaily
+TO SSTREAM @outputBusinessDaily;

@@ -1,0 +1,41 @@
+﻿//Script GUID:d310c213-87a4-4fdc-a01c-3fe7a6f85b92
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 6), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-29);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/Search/QOptimizationMetrics";
+#DECLARE outputForzaData = string.Format("{0}/ForzaChecks/ForzaData_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputForzaDatacsv  = string.Format("{0}/ForzaChecks/ForzaData_{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+
+inputData =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    )
+;
+
+BaseDataDailyQ4 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName LIKE "%SFA-EXP-d161b448ec%" 
+          AND Country IN ("FR","DE","MX","ES","BR")
+          AND ContentSource == "ZeroResult"
+          AND SearchTerm.ToLower().Equals("forza horizon 3");
+;
+
+OUTPUT BaseDataDailyQ4 TO SSTREAM @outputForzaData
+;
+
+OUTPUT BaseDataDailyQ4 
+    TO @outputForzaDatacsv
+    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);

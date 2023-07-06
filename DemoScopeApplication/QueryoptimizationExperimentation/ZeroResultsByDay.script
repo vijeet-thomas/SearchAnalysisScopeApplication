@@ -1,0 +1,146 @@
+﻿//Script GUID:e02f0768-7b89-433a-bb71-658ecb38fdfe
+//Used for tracking history
+
+//Script GUID:d310c213-87a4-4fdc-a01c-3fe7a6f85b92
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 15), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-31);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/ZeroResults/";
+#DECLARE outputDateZeroResultsNew = string.Format("{0}/DateWiseZeroResultsMayNewSP_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputDateZeroResultsNewCsv = string.Format("{0}/DateWiseZeroResultsNew_{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+#DECLARE outputDateZeroResultsOld = string.Format("{0}/DateWiseZeroResultsOld_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputDateZeroResultsOldCsv = string.Format("{0}/DateWiseZeroResultsOld_{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+#DECLARE outputDateZeroResultsCombined = string.Format("{0}/DateWiseZeroResultsCombined_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputDateZeroResultsCombinedCsv = string.Format("{0}/DateWiseZeroResultsCombined_{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+
+inputData =
+    //VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs/SearchProduct/SearchProduct.view"
+    PARAMS
+    (
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    )
+;
+
+BaseDataDailyNew =
+    SELECT *
+    FROM inputData
+    WHERE 
+          SearchType == "Regular"
+          //AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          //AND ContentSource == "ZeroResult"
+;
+//
+//BaseDataDailyOld =
+//    SELECT *
+//    FROM inputData
+//    WHERE 
+//          AppVer IN ("22210","22209","22211")   
+//          AND SearchType == "Regular"
+//          AND DeviceClass == "Windows.Desktop"
+//          AND SearchTerm.Length > 0
+//          AND FlightName NOT LIKE "%SFA-EXP-d161b448ec%" 
+//          //AND ContentSource == "ZeroResult"
+//          AND Country IN ("FR","DE","MX","ES","BR")
+//          ;
+
+ZeroSearchesDailyNewQuery =
+    SELECT DateId/100 AS YearMonth,
+           SearchTerm,
+           Country,
+           COUNT(DISTINCT CVRoot) AS ZeroSearchesNewQuery
+    FROM BaseDataDailyNew
+    WHERE String.IsNullOrEmpty(ProductId) && String.IsNullOrEmpty(SuggestedTerm) && !String.IsNullOrEmpty(SearchTerm)
+;
+
+SearchesDailyNewQuery =
+    SELECT DateId/100 AS YearMonth,
+           SearchTerm,
+           Country,
+           COUNT(DISTINCT CVRoot) AS TotalSearchesNewQuery
+    FROM BaseDataDailyNew;
+
+//ZeroSearchesDailyOldQuery =
+//    SELECT DateId, 
+//           SearchTerm,
+//           Country,
+//           COUNT(DISTINCT PageImpressionGuid) AS ZeroSearchesOldQuery
+//    FROM BaseDataDailyOld
+//    WHERE ContentSource == "ZeroResult"
+//;
+//
+//SearchesDailyOldQuery =
+//    SELECT DateId, 
+//           SearchTerm,
+//           Country,
+//           COUNT(DISTINCT PageImpressionGuid) AS TotalSearchesOldQuery
+//    FROM BaseDataDailyOld;
+
+DatewiseZeroResultsNew = 
+    SELECT a.*,
+           (c.ZeroSearchesNewQuery IS NULL ? 0 : c.ZeroSearchesNewQuery) AS ZeroSearchesNewQuery
+    FROM SearchesDailyNewQuery AS a 
+         LEFT JOIN ZeroSearchesDailyNewQuery AS c
+         ON a.YearMonth == c.YearMonth AND a.SearchTerm == c.SearchTerm AND a.Country == c.Country
+;
+
+//DatewiseZeroResultsOld = 
+//    SELECT d.*,
+//           (b.ZeroSearchesOldQuery IS NULL ? 0 : b.ZeroSearchesOldQuery) AS ZeroSearchesOldQuery
+//    FROM SearchesDailyOldQuery AS d
+//         LEFT JOIN ZeroSearchesDailyOldQuery AS b 
+//         ON b.DateId== d.DateId AND b.SearchTerm == d.SearchTerm AND b.Country == d.Country
+//;
+
+DatewiseZeroResultsNew = 
+    SELECT YearMonth, 
+           SUM(ZeroSearchesNewQuery)  AS ZeroSearchesNewQuery,
+           SUM(TotalSearchesNewQuery) AS TotalSearchesNewQuery,
+           SUM(ZeroSearchesNewQuery)*100.0/SUM(TotalSearchesNewQuery) AS ZeroSearchesPercentageNewQuery
+           FROM DatewiseZeroResultsNew;
+
+//DatewiseZeroResultsOld = 
+//    SELECT DateId, 
+//           SUM(ZeroSearchesOldQuery)  AS ZeroSearchesOldQuery,
+//           SUM(TotalSearchesOldQuery) AS TotalSearchesOldQuery,
+//           SUM(ZeroSearchesOldQuery)*100.0/SUM(TotalSearchesOldQuery) AS ZeroSearchesPercentageOldQuery
+//           FROM DatewiseZeroResultsOld;
+//
+//CombinedData = SELECT a.*,
+//                      b.*.Except(DateId) 
+//                      FROM DatewiseZeroResultsOld AS a 
+//                           INNER JOIN DatewiseZeroResultsNew AS b
+//                                      ON a.DateId == b.DateId
+//;
+
+OUTPUT DatewiseZeroResultsNew TO SSTREAM @outputDateZeroResultsNew
+        CLUSTERED BY YearMonth
+        SORTED BY ZeroSearchesNewQuery DESC, TotalSearchesNewQuery DESC
+;
+
+//OUTPUT DatewiseZeroResultsNew 
+//    TO @outputDateZeroResultsNewCsv
+//    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);
+//
+//OUTPUT DatewiseZeroResultsOld TO SSTREAM @outputDateZeroResultsOld
+//        CLUSTERED BY DateId
+//        SORTED BY ZeroSearchesOldQuery DESC, TotalSearchesOldQuery DESC
+//;
+//
+//OUTPUT DatewiseZeroResultsOld 
+//    TO @outputDateZeroResultsOldCsv
+//    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);
+//
+//
+//OUTPUT CombinedData TO SSTREAM @outputDateZeroResultsCombined
+//;
+//
+//OUTPUT CombinedData 
+//    TO @outputDateZeroResultsCombinedCsv
+//    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);

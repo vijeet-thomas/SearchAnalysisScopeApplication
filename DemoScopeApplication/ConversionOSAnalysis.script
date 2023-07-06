@@ -1,0 +1,123 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:b4a0b2eb-080f-48d6-9230-a6d12378871b
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 6), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate;//.AddDays(-31);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+#DECLARE outputRoot string = @"users/vijeetthomas/OSAnalysis";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/OSAnalysisPerSearch5.ss", @outputRoot);
+#DECLARE outputStreamPerSession string = string.Format("{0}/OSAnalysisPerSession5.ss", @outputRoot);
+#DECLARE streamExpiryString string = "60";
+//#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_PageImpressions/UniversalStore_PageImpressions.view";
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+#DECLARE UniversalView string = @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view";
+
+inputData =
+    VIEW @UniversalView //@SFAView
+    PARAMS 
+    (
+        //startDate = @startDate1DayString,
+        //endDate = @endDateString
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    );
+
+AllSearches =
+    SELECT *.Except(OSVersion),
+           //SearchTerm.ToLower().Trim() AS SearchTerm,
+           "Windows "+OSVersion.Split('.')[0] AS OSVersion
+    FROM inputData
+    WHERE ReferrerUri.Contains("pages/searchResults")
+          OR Uri.Contains("pages/searchResults")
+    OR ReferrerUri.Contains("pages/search?")
+          OR Uri.Contains("pages/search?")
+;
+
+TotalSearchesPerSearch =
+    SELECT OSVersion,
+           //Ref_CustomAttribute_3 AS SearchTerm,
+           COUNT(DISTINCT ImpressionGuid) AS TotalSearches
+    FROM AllSearches;
+
+CTRPerSearch =
+    SELECT "Windows "+OSVersion.Split('.')[0] AS OSVersion,
+           //Ref_CustomAttribute_3 AS SearchTerm,
+           COUNT(DISTINCT ImpressionGuid) AS ClickCount
+    FROM AllSearches
+    WHERE Uri.Contains("pages/pdp")
+ //AND (ReferrerUri.Contains("pages/search?") OR ReferrerUri.Contains("pages/searchResults"))
+          ;
+
+InstallPerSearch =
+    SELECT "Windows "+OSVersion.Split('.')[0] AS OSVersion,
+           //Ref_CustomAttribute_3 AS SearchTerm,
+           //SUM(AttemptedAcquisitionCount) AS InstallCount
+           SUM(AttemptedAcquisitions_Total) AS InstallCount
+    FROM AllSearches//inputData
+    WHERE //AttemptedAcquisitionCount > 0;
+   // (ReferrerUri.Contains("pages/search?") OR ReferrerUri.Contains("pages/searchResults")) AND
+    AttemptedAcquisitions_Total>0;
+
+SearchSummary = 
+    SELECT a.*, b.ClickCount, c.InstallCount 
+    FROM TotalSearchesPerSearch AS a
+                  INNER JOIN CTRPerSearch AS b ON  a.OSVersion == b.OSVersion 
+                                                   //AND a.SearchTerm == b.SearchTerm
+                             INNER JOIN InstallPerSearch AS c ON a.OSVersion == c.OSVersion 
+                                                                 //AND a.SearchTerm == c.SearchTerm
+;
+
+SearchSummary = SELECT *,
+                (ClickCount * 100.0/ TotalSearches) AS CTR,
+                (InstallCount * 100.0 / TotalSearches) AS Conversion
+ FROM SearchSummary
+;
+OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch;
+
+TotalSearchesPerSession =
+    SELECT OSVersion,
+           //Ref_CustomAttribute_3 AS SearchTerm,
+           COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM AllSearches;
+
+
+CTRPerSession =
+    SELECT "Windows "+OSVersion.Split('.')[0] AS OSVersion,
+           //Ref_CustomAttribute_3 AS SearchTerm,
+           COUNT(DISTINCT CVRoot) AS ClickCount
+    FROM AllSearches//inputData
+    WHERE Uri.Contains("pages/pdp")
+//AND (ReferrerUri.Contains("pages/search?") OR ReferrerUri.Contains("pages/searchResults"))
+;
+
+InstallPerSession =
+    SELECT "Windows "+OSVersion.Split('.')[0] AS OSVersion,
+           //Ref_CustomAttribute_3 AS SearchTerm,
+           //SUM(AttemptedAcquisitionCount) AS InstallCount
+           SUM(AttemptedAcquisitions_Total) AS InstallCount
+    FROM AllSearches//inputData
+    WHERE  //AttemptedAcquisitionCount > 0;
+    //(ReferrerUri.Contains("pages/search?") OR ReferrerUri.Contains("pages/searchResults")) AND
+    AttemptedAcquisitions_Total>0;
+
+SessionSummary = 
+ SELECT a.*, b.ClickCount, c.InstallCount 
+    FROM TotalSearchesPerSession AS a
+                  INNER JOIN CTRPerSession AS b ON  a.OSVersion == b.OSVersion  
+                                                    //AND a.SearchTerm == b.SearchTerm
+                             INNER JOIN InstallPerSession AS c ON a.OSVersion == c.OSVersion 
+                                                                  //AND a.SearchTerm == c.SearchTerm
+;
+
+SessionSummary = SELECT *,
+                (ClickCount * 100.0/ TotalSearches) AS CTR,
+                (InstallCount * 100.0 / TotalSearches) AS Conversion
+ FROM SessionSummary
+;
+                  ;
+
+OUTPUT SessionSummary TO SSTREAM @outputStreamPerSession;
+

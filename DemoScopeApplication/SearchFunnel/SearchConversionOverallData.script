@@ -1,0 +1,136 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:e75d0a08-4b5c-4e66-ae63-80e1d4c7debb
+// Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+//#DECLARE rootFolder string = @"/users/vijeetthomas/SearchFunnel/";
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE inputBaseDataMarch string  = string.Format("{0}/BaseDataMarch.ss",@rootFolder,@endDate);
+#DECLARE inputBaseDataApril string  = string.Format("{0}/BaseDataApril.ss",@rootFolder,@endDate);
+#DECLARE inputBaseDataFeb string  = string.Format("{0}/BaseDataFeb.ss",@rootFolder,@endDate);
+
+#DECLARE outputComparisonStream3 string = string.Format("{0}/ConversionOverallAnalysisWW.ss", @rootFolder);
+
+BaseDataMarch1 =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataMarch
+    )
+    ;
+
+SearchesMarch1 =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM BaseDataMarch1
+    ;
+
+SearchClicksAndInstallsMarch1 = SELECT COUNT (DISTINCT CVRoot) AS Clicks,
+                            //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls) AS Installs
+                          FROM BaseDataMarch1
+                          //WHERE IsClicked == 1;
+                               WHERE IsClicked == true;
+
+TotalCLicksAndInstallsMarch1 = 
+ SELECT SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+        FROM SearchClicksAndInstallsMarch1;
+
+MarchData =
+    SELECT "March" AS Month,
+           //"enablePremiumSearch" AS FlightName,
+           a.*,
+           b.Clicks AS Clicks,
+           b.Installs AS Installs,
+           (b.Clicks*100.0/a.TotalSearches) AS CTRPercentage,
+           (b.Installs*100.0/a.TotalSearches) AS ConversionPercentage
+    FROM SearchesMarch1 AS a
+         CROSS JOIN
+        TotalCLicksAndInstallsMarch1 AS b
+        ;
+
+BaseDataApril1 =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataApril
+    )
+    ;
+
+SearchesApril1 =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM BaseDataApril1    
+;
+
+SearchClicksAndInstallsApril1 = SELECT COUNT (DISTINCT CVRoot) AS Clicks,
+                            //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls) AS Installs
+                          FROM BaseDataApril1
+                          //WHERE IsClicked == 1;
+                               WHERE IsClicked == true;
+
+TotalCLicksAndInstallsApril1 = 
+ SELECT SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+        FROM SearchClicksAndInstallsApril1;
+
+AprilData =
+    SELECT "April" AS Month,
+           //"enablePremiumSearch" AS FlightName,
+           a.*,
+           b.Clicks AS Clicks,
+           b.Installs AS Installs,
+           (b.Clicks*100.0/a.TotalSearches) AS CTRPercentage,
+           (b.Installs*100.0/a.TotalSearches) AS ConversionPercentage
+    FROM SearchesApril1 AS a
+         CROSS JOIN
+        TotalCLicksAndInstallsApril1 AS b
+;
+
+BaseDataFeb =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataFeb
+    )
+    ;
+
+SearchesFeb =
+    SELECT COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM BaseDataFeb    
+;
+
+SearchClicksAndInstallsFeb = SELECT COUNT (DISTINCT CVRoot) AS Clicks,
+                            //SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls) AS Installs
+                          FROM BaseDataFeb
+                          //WHERE IsClicked == 1;
+                               WHERE IsClicked == true;
+
+TotalCLicksAndInstallsFeb = 
+ SELECT SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+        FROM SearchClicksAndInstallsFeb;
+
+FebData =
+    SELECT "February" AS Month,
+           //"enablePremiumSearch" AS FlightName,
+           a.*,
+           b.Clicks AS Clicks,
+           b.Installs AS Installs,
+           (b.Clicks*100.0/a.TotalSearches) AS CTRPercentage,
+           (b.Installs*100.0/a.TotalSearches) AS ConversionPercentage
+    FROM SearchesFeb AS a
+         CROSS JOIN
+        TotalCLicksAndInstallsFeb AS b
+;
+
+ComparisonStream =
+    SELECT *           
+    FROM MarchData AS a
+    UNION ALL SELECT * FROM AprilData AS b 
+UNION ALL SELECT * FROM FebData AS c ;
+
+OUTPUT ComparisonStream TO SSTREAM @outputComparisonStream3;

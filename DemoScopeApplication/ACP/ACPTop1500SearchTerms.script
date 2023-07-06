@@ -1,8 +1,8 @@
 ﻿//Script GUID:a77017ca-c93a-4451-b998-73e2445703ac
 //Used for tracking history
-#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 6), DateTime.Parse("@@endDate@@"));
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 4), DateTime.Parse("@@endDate@@"));
 
-#DECLARE numberOfDays int = 31;
+#DECLARE numberOfDays int = 26;
 #DECLARE startDate DateTime = @endDate.AddDays(1 - @numberOfDays);
 #DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
 #DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
@@ -28,18 +28,19 @@ searches =
           AND IsTest!= 1  
           AND IsFinalSearch 
           AND SearchType == "Regular"
-          AND DeviceClass == "Windows.Desktop";
+          AND DeviceClass == "Windows.Desktop"
+          ;
 
 // Search Count for current month
 SearchesAgg = 
-    SELECT YearMonth,
+    SELECT //YearMonth,
            SearchTerm,
            COUNT(DISTINCT DeviceIdFull) AS SearchCount
     FROM searches;
 
 // Ranking the searchterms by searcount
 SearchesRanked = 
-    SELECT YearMonth,
+    SELECT //YearMonth,
            SearchTerm,
            SearchCount,
            RANK() OVER(ORDER BY SearchCount DESC) AS RankBySearchCount
@@ -47,11 +48,11 @@ SearchesRanked =
 
 // Getting the top 1000 Records for current month
 TopSearches_CurrentMonth = 
-    SELECT YearMonth,
+    SELECT //YearMonth,
            SearchTerm,
            SearchCount
     FROM SearchesRanked
-    WHERE RankBySearchCount <= 1500;
+    WHERE RankBySearchCount <= 5000;
 
 // This view will be used to get searches for the Month
 searchProducts =
@@ -71,6 +72,7 @@ searchProducts = SELECT * FROM searchProducts
           AND SearchType == "Regular"
           AND DeviceClass == "Windows.Desktop"
           AND IsClicked == true
+          AND SlotNumber >= 0
 ;
 
 searches =
@@ -81,8 +83,9 @@ searches =
            DeviceIdFull.ToLower() AS DeviceIdFull,
            SlotNumber,
            AttemptedInstalls,
-           ResultingSuccessfulAcquisitions_Free,
-           ResultingSuccessfulAcquisitions_Paid
+           StartedPurchaseFlow_Free,
+           StartedPurchaseFlow_Paid,
+           StartedPurchaseFlow_Trial
     FROM searchProducts
     ;
 
@@ -97,14 +100,14 @@ SearchesAgg =
     SELECT SearchTerm,
            SearchCount,
            COUNT(DISTINCT DeviceIdFull) AS SearchCountFromSearchProduct,
-           AVG (SlotNumber) AS ACP,
-           (SUM(AttemptedInstalls) + SUM (ResultingSuccessfulAcquisitions_Free) + SUM (ResultingSuccessfulAcquisitions_Paid)) AS Installs
+           AVG (SlotNumber) AS Acp,
+           (SUM(AttemptedInstalls) + SUM (StartedPurchaseFlow_Free) + SUM (StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial)) AS Installs
     FROM TopSearches
     ;
 
 OUTPUT SearchesAgg TO SSTREAM @"/users/vijeetthomas/ACPForTop1500SearchTerms.ss"
 CLUSTERED BY SearchTerm 
-        SORTED BY SearchCount DESC, ACP DESC;
+        SORTED BY SearchCount DESC, Acp DESC;
 
 OUTPUT SearchesAgg TO @"/users/vijeetthomas/ACPForTop1500SearchTerms.csv" USING Outputters.Csv(outputHeader : true);
 

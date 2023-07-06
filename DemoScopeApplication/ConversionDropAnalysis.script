@@ -1,0 +1,94 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:085f0374-f7e3-418a-95d2-4b3cff6e1a27
+// Used for tracking history
+
+//Script GUID:79fc422f-819e-4f92-b697-9ede6ca8e846
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-190);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+#DECLARE rootFolder string = @"users/vijeetthomas/ConversionDrop";
+#DECLARE outputBusinessDaily string  = string.Format("{0}/ConversionDrop_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate.AddDays(-2));
+
+searchProductsDaily =
+    VIEW @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view"
+    PARAMS
+    (
+        startDate = @startDate1DayString,
+        endDate = @endDateString
+    )
+;
+
+BaseDataDaily =
+    SELECT SearchTerm.ToLower().Trim() AS SearchTerm,
+           DateId AS Timestamp,
+           ProductId,
+           ProductDisplayName,
+           SlotNumber,
+           IsClicked,
+           CVFull,
+           Country AS Market,
+           UserIdFull.ToLower() AS UserIdFull,
+           AttemptedLaunches IS NULL ? 0 : AttemptedLaunches AS AttemptedLaunches,
+           AttemptedInstalls IS NULL ? 0 : AttemptedInstalls AS AttemptedInstalls,
+           StartedPurchaseFlow_Free IS NULL? 0 : StartedPurchaseFlow_Free AS StartedPurchaseFlow_Free,
+           StartedPurchaseFlow_Paid IS NULL? 0 : StartedPurchaseFlow_Paid AS StartedPurchaseFlow_Paid,
+           StartedPurchaseFlow_Trial IS NULL? 0 : StartedPurchaseFlow_Trial AS StartedPurchaseFlow_Trial,
+           ResultingSuccessfulAcquisitions_Free IS NULL? 0 : ResultingSuccessfulAcquisitions_Free AS ResultingSuccessfulAcquisitions_Free,
+           ResultingSuccessfulAcquisitions_Paid IS NULL? 0 : ResultingSuccessfulAcquisitions_Paid AS ResultingSuccessfulAcquisitions_Paid,
+           ResultingSuccessfulAcquisitions_Trial IS NULL? 0 : ResultingSuccessfulAcquisitions_Trial AS ResultingSuccessfulAcquisitions_Trial
+    FROM searchProductsDaily
+    WHERE
+    IsTest != 1
+    AND (SearchType == "Regular" OR SearchType == "Autosuggest")
+    //AND SearchType NOT IN ("Regular","Autosuggest","AutomaticSearch")
+    AND IsFinalSearch == true
+    AND DeviceClass == "Windows.Desktop"
+    AND SearchTerm.Length > 0
+    AND SlotNumber >= 0
+    AND SearchTerm.Trim().ToLower() IN ("netflix","zoom","discord","itunes","trello","opera gx","kodi","vpn")
+    AND DateId IN (20221108, 20221206, 20221210, 20221215, 20221230);
+;
+
+SearchesDaily =
+    SELECT Timestamp, 
+           SearchTerm,
+           Market,
+           COUNT(DISTINCT CVFull) AS TotalSearches
+    FROM BaseDataDaily;
+
+SearchClicksAndInstallsDaily = SELECT Timestamp, SearchTerm, Market, CVFull,
+                            Math.Min(1, COUNT(DISTINCT CVFull)) AS Clicks,
+                            Math.Min(1, SUM(AttemptedLaunches)) AS AttemptedLaunches,
+                            Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
+                          FROM BaseDataDaily
+                          WHERE IsClicked == true;
+
+TotalClicksAndInstallsDaily =
+    SELECT Timestamp, 
+           SearchTerm,
+           Market,
+           SUM(AttemptedLaunches) AS TotalLaunches,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstallsDaily;
+
+SearchesAggDaily = 
+    SELECT a.*,
+           b.TotalLaunches,
+           b.TotalClicks,
+           b.TotalInstalls
+    FROM SearchesDaily AS a LEFT JOIN TotalClicksAndInstallsDaily AS b ON a.SearchTerm == b.SearchTerm AND a.Market == b.Market AND a.Timestamp == b.Timestamp;
+
+SearchesAggDaily = 
+    SELECT 
+           *,
+           TotalInstalls * 100.0 / TotalSearches AS ConversionPercentage,
+           TotalClicks * 100.0 / TotalSearches AS CTRPercentage
+    FROM SearchesAggDaily;
+
+OUTPUT SearchesAggDaily TO SSTREAM @outputBusinessDaily
+  CLUSTERED BY Timestamp, SearchTerm, Market
+        SORTED BY TotalSearches DESC, TotalClicks DESC, TotalInstalls DESC;

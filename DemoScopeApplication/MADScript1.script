@@ -1,41 +1,41 @@
-﻿//Script GUID:8b5a8586-926c-48b5-a48f-7d13ef7a8368
+﻿//Script GUID:3109ae9a-8246-441d-8260-c2915d284ae6
 //Used for tracking history
 
-#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
-MODULE @PrivacyAnnotationPath;
-
-MODULE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/CSV/AppsCommonScriptUtilsModule.module"; 
-
-REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Microsoft.Telemetry.Cosmos.Application.dll";
-REFERENCE "/shares/asimov.prod.data/Public/Resources/Latest/Device/Microsoft.Telemetry.Common.Utilities.dll";
-
-USING Microsoft.Telemetry.Cosmos.Application;
-USING Microsoft.Telemetry.Common.Utilities;
-
-// Modules and References
-[PIN] MODULE "shares/asimov.prod.data/Public/Resources/Latest/Asimov/Api/v3/Asimov.Batch.module";
-
-//AppUsage fact cooker stck
-[PIN] MODULE "shares/asimov.prod.data/Public/Resources/Latest/Usage/DynamicView/FactsExtractor.module";
-[PIN] RESOURCE  "shares/asimov.prod.data/Public/Resources/Latest/Usage/DynamicView/AppUsage/AppUsageViews.xml";
-[PIN] REFERENCE "shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.Telemetry.AppUsage.dll";
-[PIN] REFERENCE "shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.OSG.OneStore.DnA.Cosmos.DynamicViewResolver.dll";
-[PIN] REFERENCE "shares/asimov.prod.data/Public/Resources/Latest/Usage/AppUsage/Microsoft.Telemetry.Cosmos.AppUsage.AsimovExtension.dll";
-
-//#DECLARE aggregatedViewPath string = "/shares/asimov.prod.data/Public/Processed/Usage/AppUsage/AggregatedAppUsageMetrics/AggregatedAppUsageMetrics.view";
 #DECLARE appUsageViewPath string = "/shares/asimov.prod.data/Public/Processed/Usage/AppUsage/AppUsageMetrics/AppUsageMetricsByOsmajorApp_v06.view";
 #DECLARE appmonikerProductIdMapper string = @"/shares/asimov.prod.data/Public/Processed/Common/Dimensions/Application/AppMonikerProductIdDictionary.ss";
 #DECLARE win32Mapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreAnalytics/Launches/SparkProductIdToAppMonikerMapping.ss";
+
+MODULE "/shares/asimov.prod.data/Public/Resources/Latest/Dimensions/CommonDimensions.module" AS CommonDimensions;
+#DECLARE dimGeographyView string = @"/shares/asimov.prod.data/Public/Processed/Common/Dimensions/DimGeography/DimGeography.view";
+
+#DECLARE dimAppView string = @"/shares/asimov.prod.data/Public/Processed/Common/Dimensions/DimApp/DimApp.view"; 
+#DECLARE dimAppViewVersion string = "V9";
+#DECLARE MadMaxThreshold int = 1000000;
+
+// --------------------------------------------------------------------------------------------------------------------
+// Variables and Defaults
+// --------------------------------------------------------------------------------------------------------------------
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+
+// Output
+#DECLARE outputRoot string = @"/users/vijeetthomas/";
+//#DECLARE outputRoot string = @"/users/vijeetthomas/Search/RelevanceScore/";
+#DECLARE outputStream_AppUsagedata string = string.Format("{0}/{1:yyyy}/{1:MM}/AppUsagedata_{1:yyyy}_{1:MM}_{1:dd}.ss", @outputRoot.TrimEnd(new[]{ '/' }), @endDate);
+#DECLARE streamExpiryString string = "30";
+
+dimGeography = VIEW @dimGeographyView
+PARAMS
+(
+version = "V3"
+);
 
 agv1 = 
 VIEW @appUsageViewPath
     PARAMS
     (
         startDate = new DateTime(DateTime.UtcNow.AddMonths( - 1).Year, DateTime.UtcNow.AddMonths( - 1).Month, 15),//.AddMonths(1).AddDays(-1),
-        newDate = new DateTime(oldDate.Year, oldDate.Month, oldDate.Day, 12, 30 , 0),
         endDate = new DateTime(DateTime.UtcNow.AddMonths( - 1).Year, DateTime.UtcNow.AddMonths( - 1).Month, 15)//.AddMonths(1).AddDays(-1)
 	);
-
 
 agv2 = 
 VIEW @appUsageViewPath
@@ -126,154 +126,106 @@ VIEW @appUsageViewPath
 	);
 
 agv1 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
-            CountryName,
-            SUM(ActiveUserCount28Day) AS MAU28,
-            SUM(ActiveUserCount30Day) AS MAU30,
-            SUM(ActiveDeviceCount28Day) AS MAD28,
-            SUM(ActiveDeviceCount30Day) AS MAD30
+    SELECT AppMoniker,
+           CountryName,
+           SUM(ActiveUserCount28Day) AS MAU28,
+           SUM(ActiveUserCount30Day) AS MAU30,
+           SUM(ActiveDeviceCount28Day) AS MAD28,
+           SUM(ActiveDeviceCount30Day) AS MAD30
     FROM agv1;
 
 agv2 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
-            CountryName,
-            SUM(ActiveUserCount28Day) AS MAU28,
-            SUM(ActiveUserCount30Day) AS MAU30,
-            SUM(ActiveDeviceCount28Day) AS MAD28,
-            SUM(ActiveDeviceCount30Day) AS MAD30
+    SELECT AppMoniker,
+           CountryName,
+           SUM(ActiveUserCount28Day) AS MAU28,
+           SUM(ActiveUserCount30Day) AS MAU30,
+           SUM(ActiveDeviceCount28Day) AS MAD28,
+           SUM(ActiveDeviceCount30Day) AS MAD30
     FROM agv2;
 
 agv3 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
-            CountryName,
-            SUM(ActiveUserCount28Day) AS MAU28,
-            SUM(ActiveUserCount30Day) AS MAU30,
-            SUM(ActiveDeviceCount28Day) AS MAD28,
-            SUM(ActiveDeviceCount30Day) AS MAD30
+    SELECT AppMoniker,
+           CountryName,
+           SUM(ActiveUserCount28Day) AS MAU28,
+           SUM(ActiveUserCount30Day) AS MAU30,
+           SUM(ActiveDeviceCount28Day) AS MAD28,
+           SUM(ActiveDeviceCount30Day) AS MAD30
     FROM agv3;
 
 agv4 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
-            CountryName,
-            SUM(ActiveUserCount28Day) AS MAU28,
-            SUM(ActiveUserCount30Day) AS MAU30,
-            SUM(ActiveDeviceCount28Day) AS MAD28,
-            SUM(ActiveDeviceCount30Day) AS MAD30
+    SELECT AppMoniker,
+           CountryName,
+           SUM(ActiveUserCount28Day) AS MAU28,
+           SUM(ActiveUserCount30Day) AS MAU30,
+           SUM(ActiveDeviceCount28Day) AS MAD28,
+           SUM(ActiveDeviceCount30Day) AS MAD30
     FROM agv4;
 
 agv5 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
-            CountryName,
-            SUM(ActiveUserCount28Day) AS MAU28,
-            SUM(ActiveUserCount30Day) AS MAU30,
-            SUM(ActiveDeviceCount28Day) AS MAD28,
-            SUM(ActiveDeviceCount30Day) AS MAD30
+    SELECT AppMoniker,
+           CountryName,
+           SUM(ActiveUserCount28Day) AS MAU28,
+           SUM(ActiveUserCount30Day) AS MAU30,
+           SUM(ActiveDeviceCount28Day) AS MAD28,
+           SUM(ActiveDeviceCount30Day) AS MAD30
     FROM agv5;
 
 agv6 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
-            CountryName,
-            SUM(ActiveUserCount28Day) AS MAU28,
-            SUM(ActiveUserCount30Day) AS MAU30,
-            SUM(ActiveDeviceCount28Day) AS MAD28,
-            SUM(ActiveDeviceCount30Day) AS MAD30
+    SELECT AppMoniker,
+           CountryName,
+           SUM(ActiveUserCount28Day) AS MAU28,
+           SUM(ActiveUserCount30Day) AS MAU30,
+           SUM(ActiveDeviceCount28Day) AS MAD28,
+           SUM(ActiveDeviceCount30Day) AS MAD30
     FROM agv6;
 
 agv7 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
-            CountryName,
-            SUM(ActiveUserCount28Day) AS MAU28,
-            SUM(ActiveUserCount30Day) AS MAU30,
-            SUM(ActiveDeviceCount28Day) AS MAD28,
-            SUM(ActiveDeviceCount30Day) AS MAD30
+    SELECT AppMoniker,
+           CountryName,
+           SUM(ActiveUserCount28Day) AS MAU28,
+           SUM(ActiveUserCount30Day) AS MAU30,
+           SUM(ActiveDeviceCount28Day) AS MAD28,
+           SUM(ActiveDeviceCount30Day) AS MAD30
     FROM agv7;
 
 agv8 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
-            CountryName,
-            SUM(ActiveUserCount28Day) AS MAU28,
-            SUM(ActiveUserCount30Day) AS MAU30,
-            SUM(ActiveDeviceCount28Day) AS MAD28,
-            SUM(ActiveDeviceCount30Day) AS MAD30
+    SELECT AppMoniker,
+           CountryName,
+           SUM(ActiveUserCount28Day) AS MAU28,
+           SUM(ActiveUserCount30Day) AS MAU30,
+           SUM(ActiveDeviceCount28Day) AS MAD28,
+           SUM(ActiveDeviceCount30Day) AS MAD30
     FROM agv8;
 
 agv9 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
-            CountryName,
-            SUM(ActiveUserCount28Day) AS MAU28,
-            SUM(ActiveUserCount30Day) AS MAU30,
-            SUM(ActiveDeviceCount28Day) AS MAD28,
-            SUM(ActiveDeviceCount30Day) AS MAD30
+    SELECT AppMoniker,
+           CountryName,
+           SUM(ActiveUserCount28Day) AS MAU28,
+           SUM(ActiveUserCount30Day) AS MAU30,
+           SUM(ActiveDeviceCount28Day) AS MAD28,
+           SUM(ActiveDeviceCount30Day) AS MAD30
     FROM agv9;
 
 agv10 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
-            CountryName,
-            SUM(ActiveUserCount28Day) AS MAU28,
-            SUM(ActiveUserCount30Day) AS MAU30,
-            SUM(ActiveDeviceCount28Day) AS MAD28,
-            SUM(ActiveDeviceCount30Day) AS MAD30
+    SELECT AppMoniker,
+           CountryName,
+           SUM(ActiveUserCount28Day) AS MAU28,
+           SUM(ActiveUserCount30Day) AS MAU30,
+           SUM(ActiveDeviceCount28Day) AS MAD28,
+           SUM(ActiveDeviceCount30Day) AS MAD30
     FROM agv10;
 
 agv11 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
-            CountryName,
-            SUM(ActiveUserCount28Day) AS MAU28,
-            SUM(ActiveUserCount30Day) AS MAU30,
-            SUM(ActiveDeviceCount28Day) AS MAD28,
-            SUM(ActiveDeviceCount30Day) AS MAD30
+    SELECT AppMoniker,
+           CountryName,
+           SUM(ActiveUserCount28Day) AS MAU28,
+           SUM(ActiveUserCount30Day) AS MAU30,
+           SUM(ActiveDeviceCount28Day) AS MAD28,
+           SUM(ActiveDeviceCount30Day) AS MAD30
     FROM agv11;
 
 agv12 =
-    SELECT  
-            AppMonikerId,
-            AppMoniker,
-            OS,
-            OSName,
+    SELECT  AppMoniker,
             CountryName,
             SUM(ActiveUserCount28Day) AS MAU28,
             SUM(ActiveUserCount30Day) AS MAU30,
@@ -306,20 +258,74 @@ agv = SELECT * FROM agv1
       SELECT * FROM agv12;
 
 agv =
-    SELECT AppMonikerId,
-           AppMoniker,
-           OS,
-           OSName,
+    SELECT AppMoniker,
            CountryName,
+           ISO2CharCountryCode AS Market,
            AVG(MAU28) AS AvgMAU28,
            AVG(MAU30) AS AvgMAU30,
            AVG(MAD28) AS AvgMAD28,
            AVG(MAD30) AS AvgMAD30
-    FROM agv;
+    FROM agv LEFT JOIN dimGeography ON ISOCountryShortName == CountryName;
 
 agv = SELECT DISTINCT * FROM agv;
-      
-                    
-OUTPUT agv
-TO SSTREAM @"/users/vijeetthomas/AppUsage/AppUsageDataAll.ss"
+
+agv =
+    SELECT *,
+           AppMoniker.Trim().ToLower() AS AppMonikerCleaned
+    FROM agv
+    WHERE !string.IsNullOrEmpty(AppMoniker);
+
+dimApp =
+    VIEW @dimAppView
+    PARAMS
+    (
+       version = @dimAppViewVersion
+    );
+
+dimAppFiltered =
+    SELECT AppMoniker.Trim().ToLower() AS AppMonikerCleaned,
+           AppId,
+           OneStoreProductId AS ProductId
+    FROM dimApp
+    WHERE AppName != "" 
+          AND PublisherType != ""
+          AND AppType == "Modern"
+          AND !string.IsNullOrEmpty(AppMoniker);
+
+storeMapper =
+    SELECT *,
+           AppMoniker.Trim().ToLower() AS AppMonikerCleaned
+    FROM
+    (
+        SSTREAM @win32Mapper
+    );
+
+appUsageByProductId =
+    SELECT a.*,
+           !String.IsNullOrEmpty(m.ProductId) ? s.ProductId : m.ProductId AS ProductId
+    FROM agv AS a
+         LEFT JOIN
+             dimAppFiltered AS m
+         ON a.AppMonikerCleaned == m.AppMonikerCleaned
+         LEFT JOIN
+              storeMapper AS s
+         ON a.AppMonikerCleaned == s.AppMonikerCleaned;     
+    
+appUsageByProductId = 
+SELECT DISTINCT *
+FROM appUsageByProductId;
+//WHERE ProductId IS NOT NULL;
+
+appUsageByProductId =
+SELECT AppMonikerCleaned,
+       ProductId,
+       Market,
+       SUM(AvgMAD28) > @MadMaxThreshold ? @MadMaxThreshold : SUM(AvgMAD28) AS MadCountCleaned
+FROM appUsageByProductId
+GROUP BY AppMonikerCleaned, ProductId, Market;
+
+OUTPUT appUsageByProductId TO SSTREAM @outputStream_AppUsagedata
+CLUSTERED BY ProductId,
+            Market
+SORTED BY MadCountCleaned DESC
 WITH STREAMEXPIRY "30";

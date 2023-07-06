@@ -1,0 +1,58 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:e75d0a08-4b5c-4e66-ae63-80e1d4c7debb
+// Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-30);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+//#DECLARE rootFolder string = @"/users/vijeetthomas/SearchFunnel/";
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/Firefox";
+#DECLARE inputBaseDataApril string  = string.Format("{0}/BaseDataApril.ss",@rootFolder,@endDate);
+
+#DECLARE outputComparisonStream3 string = string.Format("{0}/FlightAnalysis.ss", @rootFolder);
+
+BaseDataApril1 =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputBaseDataApril
+    )
+    WHERE SlotNumber == 0
+    AND prod;
+
+SearchesApril1 =
+    SELECT FlightName,
+           COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM BaseDataApril1    
+;
+
+SearchClicksAndInstallsApril1 = SELECT FlightName,
+                                       COUNT (DISTINCT CVRoot) AS Clicks,
+                            SUM(AttemptedAcquisitionOrInstall) AS Installs
+                            
+                          FROM BaseDataApril1
+                          WHERE IsClicked == 1;
+                          
+
+TotalCLicksAndInstallsApril1 = 
+ SELECT FlightName,
+        SUM(Clicks) AS Clicks,
+        SUM(Installs) AS Installs
+        FROM SearchClicksAndInstallsApril1;
+
+AprilData =
+    SELECT a.*,
+           b.Clicks AS Clicks,
+           b.Installs AS Installs,
+           (b.Clicks*100.0/a.TotalSearches) AS CTRPercentage,
+           (b.Installs*100.0/a.TotalSearches) AS ConversionPercentage
+    FROM SearchesApril1 AS a
+         INNER JOIN
+        TotalCLicksAndInstallsApril1 AS b
+        ON a.FlightName == b.FlightName
+;
+
+
+OUTPUT AprilData TO SSTREAM @outputComparisonStream3
+CLUSTERED BY FlightName
+SORTED BY TotalSearches DESC;

@@ -1,0 +1,56 @@
+﻿//Script GUID:a656e70d-87ce-4315-b3b5-012b337ad04d
+//Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+
+#DECLARE numberOfDays int = 40;
+#DECLARE startDate DateTime = @endDate.AddDays(1 - @numberOfDays);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+
+// Input Streams and Views
+#DECLARE inputRoot string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/KPIs/Searches/HealthMetrics/AvgClickPosition/Daily";
+#DECLARE firstClickPattern string = @"/%Y/%m/SearchProductFirstClickContentSourceMarket_%Y_%m_%d.ss";
+
+searchProductFirstClick =
+    (
+    SSTREAM SPARSE STREAMSET @inputRoot
+                   PATTERN @firstClickPattern
+                   RANGE __date = [@startDateString, @endDateString]
+    );
+
+// --------------------------------------------------------------------------------------------------------------------
+avgFirstClickPosition =
+    SELECT DateId,
+           StoreType,
+           DeviceClass,
+           SearchType,
+           MetricType,
+           AppVer,
+           Market,
+           SlotNumber,
+           SearchTerm.ToLower() AS SearchTerm
+           // AppVersion is from PageImpression and this value will be used to filter out any mismatch between pageimpression and searchProduct 
+           // on AppVersion for further aggregation. 
+           
+    FROM searchProductFirstClick
+    WHERE (AppVer LIKE "2%")
+    AND (DeviceClass == "Windows.Desktop" OR "Windows.Desktop" == "All")
+    AND (Market == "US" OR "US" == "All")
+    AND SearchType == "Regular"
+;
+
+aggregation =
+    SELECT DateId,
+           //Market,
+           SearchTerm,
+           AVG(SlotNumber) AS AvgFirstClickPosition,
+           COUNT(*) AS SearchTermCount,
+           SUM(SlotNumber) AS SumFirstClick
+    FROM avgFirstClickPosition
+    WHERE SearchType == "Regular"
+        AND SearchTerm.ToLower() == "chrome"
+;
+
+OUTPUT aggregation TO SSTREAM "/users/vijeetthomas/ACPAnalysis/ChromeACP.ss"
+        CLUSTERED BY DateId, SearchTerm
+        SORTED BY SearchTermCount DESC;

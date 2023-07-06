@@ -1,0 +1,13 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:9a62ce30-1959-4ef6-98dd-0422201a96d5
+// Used for tracking history
+
+//INPUT
+#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/StoreUsage/MSIXVC/KPI/Active/ActiveAggregates.ss";
+
+#DECLARE outputStream string = @"/users/vijeetthomas/MSIXVC_Installs.ss";
+
+inputData = SELECT * FROM (SSTREAM @inputStream) WHERE ProductId == "CFQ7TTC0K5DM";
+
+OUTPUT inputData TO SSTREAM @outputStream;
+

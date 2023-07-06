@@ -1,0 +1,149 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:b4a0b2eb-080f-48d6-9230-a6d12378871b
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 3), DateTime.Parse("@@endDate@@"));
+#DECLARE firstDayMarch DateTime = new DateTime(2023, 3, 1);
+#DECLARE firstDayApril DateTime = new DateTime(2023, 4, 1);
+#DECLARE lastDayMarch DateTime = new DateTime(2023, 3, 31);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE firstDayMarchString string = @firstDayMarch.ToString("yyyy-MM-dd");
+#DECLARE firstDayAprilString string = @firstDayApril.ToString("yyyy-MM-dd");
+#DECLARE lastDayMarchString string = @lastDayMarch.ToString("yyyy-MM-dd");
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE outputStream string = string.Format("{0}/SFARobloxConversionMarch.ss", @rootFolder);
+#DECLARE streamExpiryString string = "60";
+
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_PageImpressions/UniversalStore_PageImpressions.view";
+//#DECLARE SFAView string = @"/shares/DAP.Prod/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+//#DECLARE UniversalView string = @"/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/UniversalStore_Search/UniversalStore_SearchProduct.view";
+
+inputData =
+    VIEW @SFAView 
+    PARAMS 
+    (
+        //startDate = @startDate1DayString,
+        //endDate = @endDateString
+        startDate = @firstDayMarchString,
+        endDate = @lastDayMarchString
+    );
+
+AllSearches =
+    SELECT Nav_CustomAttribute_3.ToLower().Trim() AS SearchTerm,
+           CVRoot,
+           AttemptedAcquisitionCount,
+           Uri,
+           ReferrerUri
+    FROM inputData
+    WHERE (ReferrerUri.Contains("pages/searchResults")
+          OR Uri.Contains("pages/searchResults")
+            OR ReferrerUri.Contains("pages/search?")
+          OR Uri.Contains("pages/search?"))
+;
+
+AllSearches =
+    SELECT *
+    FROM AllSearches
+    WHERE SearchTerm == "roblox";
+
+TotalSearches =
+    SELECT SearchTerm,
+           COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM AllSearches;
+
+CTRPerSearch =
+    SELECT SearchTerm,
+           COUNT(DISTINCT CVRoot) AS ClickCount
+    FROM AllSearches
+    WHERE Uri.Contains("pages/pdp")
+          ;
+
+InstallPerSearch =
+    SELECT SearchTerm,
+           SUM(AttemptedAcquisitionCount) AS InstallCount
+    FROM AllSearches//inputData
+    WHERE 
+    AttemptedAcquisitionCount>0;
+
+SearchSummary = 
+    SELECT a.*, b.ClickCount, c.InstallCount 
+    FROM TotalSearches AS a
+                  INNER JOIN CTRPerSearch AS b ON a.SearchTerm == b.SearchTerm
+                             INNER JOIN InstallPerSearch AS c ON a.SearchTerm == c.SearchTerm
+;
+
+SearchSummary = SELECT "March" AS Month,
+                       *,
+                        (ClickCount * 100.0/ TotalSearches) AS CTR,
+                        (InstallCount * 100.0 / TotalSearches) AS Conversion
+ FROM SearchSummary
+;
+
+inputData2 =
+    VIEW @SFAView 
+    PARAMS 
+    (
+        //startDate = @startDate1DayString,
+        //endDate = @endDateString
+        startDate = @firstDayAprilString,
+        endDate = @endDateString
+    );
+
+AllSearchesApril =
+    SELECT Nav_CustomAttribute_3.ToLower().Trim() AS SearchTerm,
+           CVRoot,
+           AttemptedAcquisitionCount,
+           Uri,
+           ReferrerUri
+    FROM inputData2
+    WHERE (ReferrerUri.Contains("pages/searchResults")
+          OR Uri.Contains("pages/searchResults")
+            OR ReferrerUri.Contains("pages/search?")
+          OR Uri.Contains("pages/search?"))
+;
+
+AllSearchesApril =
+    SELECT *
+    FROM AllSearchesApril
+    WHERE SearchTerm == "roblox";
+
+TotalSearches2 =
+    SELECT SearchTerm,
+           COUNT(DISTINCT CVRoot) AS TotalSearches
+    FROM AllSearchesApril;
+
+CTRPerSearch2 =
+    SELECT SearchTerm,
+           COUNT(DISTINCT CVRoot) AS ClickCount
+    FROM AllSearchesApril
+    WHERE Uri.Contains("pages/pdp")
+          ;
+
+InstallPerSearch2 =
+    SELECT SearchTerm,
+           SUM(AttemptedAcquisitionCount) AS InstallCount
+    FROM AllSearchesApril
+    WHERE 
+    AttemptedAcquisitionCount>0;
+
+SearchSummary2 = 
+    SELECT a.*, 
+           b.ClickCount, 
+           c.InstallCount 
+    FROM TotalSearches2 AS a
+                  INNER JOIN CTRPerSearch2 AS b ON a.SearchTerm == b.SearchTerm
+                             INNER JOIN InstallPerSearch2 AS c ON a.SearchTerm == c.SearchTerm
+;
+
+SearchSummary2 = SELECT "April" AS Month,
+                       *,
+                        (ClickCount * 100.0/ TotalSearches) AS CTR,
+                        (InstallCount * 100.0 / TotalSearches) AS Conversion
+ FROM SearchSummary2
+;
+
+SearchTotalSummary = SELECT * FROM SearchSummary UNION ALL SELECT * FROM SearchSummary2;
+
+OUTPUT SearchTotalSummary TO SSTREAM @outputStream;
+

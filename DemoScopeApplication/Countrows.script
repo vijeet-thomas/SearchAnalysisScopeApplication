@@ -1,0 +1,15 @@
+﻿//Script GUID:5ae5c8ab-17fb-4fd2-8499-a95bf906074e
+//Used for tracking history
+
+inputStream =
+    SELECT *
+    FROM
+    (
+        SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/2022/11/AndroidRatingsInter2_2022_11_09.ss"
+    );
+
+countrows =
+    SELECT COUNT( * ) AS Countrows
+    FROM inputStream;
+
+OUTPUT countrows TO SSTREAM "/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/2022/11/AndroidRatingsCountRows.ss";

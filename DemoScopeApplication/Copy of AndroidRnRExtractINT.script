@@ -23,18 +23,12 @@
 // Nebula parameters
 // -----------------------------------------------------------------------------------------------------------------------------------------------------------
 SET @@FeaturePreviews = "EnableJsonOperators:on,EnableJsonIntrinsics:on";
-
-// -----------------------------------------------------------------------------------------------------------------------------------------------------------
-// NGP Tagging Module
-// -----------------------------------------------------------------------------------------------------------------------------------------------------------
-#DECLARE PrivacyAnnotationPath string = "/shares/PXSCosmos15.Prod/PXS.DeleteSignal.PROD/PrivacyAnnotation/PrivacyAnnotation.module";
-MODULE @PrivacyAnnotationPath;
-
 // -----------------------------------------------------------------------------------------------------------------------------------------------------------
 // References
 // -----------------------------------------------------------------------------------------------------------------------------------------------------------
 REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/Libraries/netstandard.dll";
 REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/Libraries/Newtonsoft.Json.dll";
+
 USING Newtonsoft.Json;
 USING Newtonsoft.Json.Converters;
 USING Newtonsoft.Json.Linq;
@@ -48,13 +42,13 @@ USING Newtonsoft.Json.Linq;
 // -----------------------------------------------------------------------------------------------------------------------------------------------------------
 // Input
 // -----------------------------------------------------------------------------------------------------------------------------------------------------------
-#DECLARE androidRnRJson string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/JsonFiles/AndroidRnR_{0:yyyy_MM_dd}.json", @endDate);
+//#DECLARE androidRnRJson string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreReco/PK/Feb/model.json";
+#DECLARE androidRnRJson string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/JsonFiles/INT/AndroidRnR_2023_02_03.json", @endDate);
 
 // -----------------------------------------------------------------------------------------------------------------------------------------------------------
 // Output
 // -----------------------------------------------------------------------------------------------------------------------------------------------------------
-#DECLARE output_AndroidRnRDatedIntermediate string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/{0:yyyy}/{0:MM}/AndroidRatingsInter_{0:yyyy_MM_dd}.ss", @endDate);
-#DECLARE output_AndroidRnRDated string = string.Format("/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/{0:yyyy}/{0:MM}/AndroidRatings_{0:yyyy_MM_dd}.ss", @endDate);
+#DECLARE output_AndroidRnRDated string = string.Format("/users/vijeetthomas/inputJson.json", @endDate);
 
 // Read in the json file where each line is a json object
 rawJsonRows =
@@ -63,54 +57,58 @@ FROM @androidRnRJson
 USING DefaultTextExtractor();
 
 // Clean up the json
-jsonCleaned =
-SELECT Regex.Replace(ProductJson.Substring(1), @"]$", "") AS ProductJson
-FROM rawJsonRows;
+//jsonCleaned =
+//SELECT Regex.Replace(ProductJson.Substring(1), @"]$", "") AS ProductJson
+//FROM rawJsonRows;
 
 androidRnRInit =
-SELECT ScopeJson.Parse<string>(ProductJson, "id") AS ProductId,
-       ScopeJson.Parse<string>(ProductJson, "catalog") AS Catalog,
-       ScopeJson.Parse<string>(ProductJson, "partnerProductId") AS PartnerProductId,
-       ScopeJson.Parse<string>(ProductJson, "summaries") AS Summaries
-FROM jsonCleaned
+SELECT *
+FROM rawJsonRows
 WHERE !string.IsNullOrWhiteSpace(ProductJson);
+//
+//androidRnRInit =
+//SELECT *.Except(Summaries),
+//       JsonConvert.DeserializeObject<List<Summary>>(Summaries) AS MarketData
+//FROM androidRnRInit
+//WHERE !string.IsNullOrWhiteSpace(Summaries) AND Summaries != "[]";
+//
+//androidRnRInit2 =
+//    SELECT RatingUtils.GetRatingPerMarket(MarketData, ProductId, Catalog, PartnerProductId) AS RatingsSet
+//    FROM androidRnRInit;
+//
+//androidRnRInit3 =
+//    SELECT *.Except(RatingsSet)
+//    FROM androidRnRInit2
+//    CROSS APPLY RatingsSet.Split('}') AS RatingsPerMarket;
+//
+//androidRnRInit3 =
+//    SELECT (RatingsPerMarket + "}") AS RatingsSet
+//    FROM androidRnRInit3;
+//
+//androidRnROutput =
+//    SELECT ScopeJson.Parse<string>(input: RatingsSet, path: "ProductId",silent:true) AS ProductId,
+//           ScopeJson.Parse<string>(input: RatingsSet, path: "Market",silent:true) AS Market,
+//           ScopeJson.Parse<string>(input: RatingsSet, path: "Catalog",silent:true) AS Catalog,
+//           ScopeJson.Parse<string>(input: RatingsSet, path: "PartnerProductId",silent:true) AS PartnerProductId,
+//           ScopeJson.Parse<long>(input: RatingsSet, path: "OneStarRatings",silent:true) AS OneStarRatings,
+//           ScopeJson.Parse<long>(input: RatingsSet, path: "TwoStarRatings",silent:true) AS TwoStarRatings,
+//           ScopeJson.Parse<long>(input: RatingsSet, path: "ThreeStarRatings",silent:true) AS ThreeStarRatings,
+//           ScopeJson.Parse<long>(input: RatingsSet, path: "FourStarRatings",silent:true) AS FourStarRatings,
+//           ScopeJson.Parse<long>(input: RatingsSet, path: "FiveStarRatings",silent:true) AS FiveStarRatings,
+//           ScopeJson.Parse<double>(input: RatingsSet, path: "RatingsAverage",silent:true) AS RatingsAverage,
+//           ScopeJson.Parse<long>(input: RatingsSet, path: "RatingsCount",silent:true) AS RatingsCount
+//    FROM androidRnRInit3
+//    WHERE !string.IsNullOrWhiteSpace(RatingsSet);
+//
+//androidRnROutput =
+//    SELECT *
+//    FROM androidRnROutput
+//    WHERE !string.IsNullOrWhiteSpace(ProductId);
 
-[Privacy.Asset.NonPersonal]
 OUTPUT androidRnRInit
-TO SSTREAM @output_AndroidRnRDatedIntermediate;
-
-androidRnRInit =
-SELECT *.Except(Summaries),
-       JsonConvert.DeserializeObject<List<Summary>>(Summaries) AS MarketData
-FROM androidRnRInit
-WHERE !string.IsNullOrWhiteSpace(Summaries) AND Summaries != "[]";
-
-
-androidRnRInit =
-    SELECT RatingUtils.GetRatingPerMarket(MarketData, ProductId, Catalog, PartnerProductId) AS RatingsSet
-    FROM androidRnRInit;
-
-androidRnROutput =
-    SELECT ScopeJson.Parse<string>(RatingsSet, "ProductId") AS ProductId,
-           ScopeJson.Parse<string>(RatingsSet, "Market") AS Market,
-           ScopeJson.Parse<string>(RatingsSet, "Catalog") AS Catalog,
-           ScopeJson.Parse<string>(RatingsSet, "PartnerProductId") AS PartnerProductId,
-           ScopeJson.Parse<long>(RatingsSet, "OneStarRatings") AS OneStarRatings,
-           ScopeJson.Parse<long>(RatingsSet, "TwoStarRatings") AS TwoStarRatings,
-           ScopeJson.Parse<long>(RatingsSet, "ThreeStarRatings") AS ThreeStarRatings,
-           ScopeJson.Parse<long>(RatingsSet, "FourStarRatings") AS FourStarRatings,
-           ScopeJson.Parse<long>(RatingsSet, "FiveStarRatings") AS FiveStarRatings,
-           ScopeJson.Parse<double>(RatingsSet, "RatingsAverage") AS RatingsAverage,
-           ScopeJson.Parse<long>(RatingsSet, "RatingsCount") AS RatingsCount
-    FROM androidRnRInit
-    WHERE !string.IsNullOrWhiteSpace(RatingsSet);
-
-[Privacy.Asset.NonPersonal]
-OUTPUT androidRnROutput
-TO SSTREAM @output_AndroidRnRDated
-   CLUSTERED BY ProductId, Market
-       SORTED BY ProductId, Market
-WITH STREAMEXPIRY @streamExpiry;
+TO @"/users/vijeetthomas/inputJson.json"
+USING Outputters.Text
+;
 
 
 #CS
@@ -126,26 +124,45 @@ public static class RatingUtils
     public static string GetRatingPerMarket(List<Summary> summaries, string ProductId, string Catalog, string PartnerProductId) {
         
         List<RatingsOutput> result = new List<RatingsOutput>();
-        foreach (var summary in summaries) {
-            if (summary != null && summary.markets[0] != null 
-                && summary.rating != null && summary.rating.starsCount != null) {
-                RatingsOutput ratObj = new RatingsOutput();
-                ratObj.ProductId = ProductId;
-                ratObj.PartnerProductId = PartnerProductId;
-                ratObj.Catalog = Catalog;
-                ratObj.Market = summary.markets[0];
-                ratObj.OneStarRatings = summary.rating.starsCount[0];
-                ratObj.TwoStarRatings = summary.rating.starsCount[1];
-                ratObj.ThreeStarRatings = summary.rating.starsCount[2];
-                ratObj.FourStarRatings = summary.rating.starsCount[3];
-                ratObj.FiveStarRatings = summary.rating.starsCount[4];
-                ratObj.RatingsAverage = summary.rating.average;
-                ratObj.RatingsCount = summary.rating.starsCount[0] + summary.rating.starsCount[1] + summary.rating.starsCount[2] + summary.rating.starsCount[3] + summary.rating.starsCount[4];
-                result.Add(ratObj);
+        int i=0;
+        int summariesCount = summaries.Count;
+        while (i<summariesCount)
+        {
+            if (summaries[i] != null && summaries[i].markets != null && summaries[i].rating != null && summaries[i].rating.starsCount != null) 
+            {
+                int j=0;
+                int marketsCount = summaries[i].markets.Count;
+                while (j<marketsCount) 
+                {
+                    if (!string.IsNullOrWhiteSpace(summaries[i].markets[j]))
+                    {
+                        RatingsOutput ratObj = getRatingsObject(summaries,i,j,summariesCount,marketsCount,PartnerProductId,Catalog,ProductId);
+                        result.Add(ratObj);
+                    }
+                    j++;
+                }
             }
+            ++i;  
         }
         
-        return string.Join(",", result);
+        return string.Join("", result);
+    }
+
+    public static RatingsOutput getRatingsObject (List<Summary> summaries, int i, int j, int summariesCount, int marketsCount, string PartnerProductId, string Catalog, string ProductId) 
+    {
+        RatingsOutput ratObj = new RatingsOutput();
+        ratObj.ProductId = ProductId;
+        ratObj.PartnerProductId = PartnerProductId;
+        ratObj.Catalog = Catalog;
+        ratObj.Market = summaries[i].markets[j];
+        ratObj.OneStarRatings = summaries[i].rating.starsCount[0];
+        ratObj.TwoStarRatings = summaries[i].rating.starsCount[1];
+        ratObj.ThreeStarRatings = summaries[i].rating.starsCount[2];
+        ratObj.FourStarRatings = summaries[i].rating.starsCount[3];
+        ratObj.FiveStarRatings = summaries[i].rating.starsCount[4];
+        ratObj.RatingsAverage = summaries[i].rating.average;
+        ratObj.RatingsCount = summaries[i].rating.starsCount[0] + summaries[i].rating.starsCount[1] + summaries[i].rating.starsCount[2] + summaries[i].rating.starsCount[3] + summaries[i].rating.starsCount[4];
+        return ratObj;
     }
 }
 public class Summary 

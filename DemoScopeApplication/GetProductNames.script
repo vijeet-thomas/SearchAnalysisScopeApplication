@@ -5,9 +5,9 @@
 // Date Parameters
 #DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
 
-#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/AndroidRatings/2022/07/AndroidRatings_2022_07_14.ss";
-#DECLARE outputStream string = @"/users/vijeetthomas/RelevanceScore/AndroidRatings/2022/07/AndroidRatings_2022_07_14.ss";
-#DECLARE streamExpiryString string = "180";
+#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/11/AggregatedScoreFraud_2022_11_26.ss";
+#DECLARE outputStream string = @"/users/vijeetthomas/RelevanceScore/OtherProducts.ss";
+#DECLARE streamExpiryString string = "1";
 
 
 input =
@@ -15,7 +15,9 @@ SELECT *
 FROM
 (
     SSTREAM @inputStream
-);
+)
+WHERE !(ProductGroupName.Equals("AppAndGame") || ProductGroupName.Equals("Win32") || ProductTypeName.Equals("TV Series") || ProductTypeName.Equals("Movie"))
+AND Market == "US";
 
 #DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
 productNames =

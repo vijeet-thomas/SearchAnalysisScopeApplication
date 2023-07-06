@@ -1,0 +1,21 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:754bb697-f96a-4d57-9e82-84dc59472de3
+// Used for tracking history
+
+#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2023/02/AggregatedScore_2023_02_04.ss";
+#DECLARE outputStream string = @"/users/vijeetthomas/win32Products.ss";
+#DECLARE outputStreamCsv string = @"/users/vijeetthomas/win32Products.csv";
+
+input = SELECT * FROM (SSTREAM @inputStream);
+
+win32 =
+    SELECT *
+    FROM input
+    WHERE ProductGroupName.Equals("Win32");
+
+OUTPUT win32 TO SSTREAM @outputStream
+;
+
+OUTPUT win32 
+    TO @outputStreamCsv
+    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);

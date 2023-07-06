@@ -1,0 +1,65 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:b4a0b2eb-080f-48d6-9230-a6d12378871b
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -2), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate;//.AddDays(-60);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+#DECLARE outputRoot string = @"users/vijeetthomas/GetsAnalysis/";
+#DECLARE outputStreamForGets string = string.Format("{0}/SFA_PageImpressionsGetAnalysis.ss", @outputRoot);
+#DECLARE outputInterStreamForGets string = string.Format("{0}/SFA_PageImpressionsGetAnalysis_IntermediateStream.ss", @outputRoot);
+#DECLARE streamExpiryString string = "60";
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+
+inputData =
+    VIEW @SFAView 
+    PARAMS 
+    (
+        startDate = @startDate1DayString,
+        endDate = @endDateString
+    );
+
+SearchGets = SELECT DateId,
+            COUNT (DISTINCT ImpressionGuid) AS SearchGetImpressions,
+            COUNT (DISTINCT CVRoot) AS SearchGetSessions
+    FROM inputData
+    WHERE (PageName  == "searchPage" OR (PageName == "pdp" AND Ref_PageName == "searchPage") OR (PageName == "pdp" AND Ref_AreaName == "AutoSuggest" AND !string.IsNullOrEmpty(ProductId)))
+    AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0) ;
+
+SearchBlankProductIds = 
+    SELECT DateId,
+           Nav_CustomAttribute_3.ToLower().Trim() AS SearchTerm,
+           ProductId,
+           ProductDisplayName,
+           PageName,
+           Ref_PageName,
+           Ref_AreaName,
+           AttemptedAcquisitionCount,
+           InstallClicks
+    FROM inputData 
+    WHERE (PageName  == "searchPage" OR (PageName == "pdp" AND Ref_PageName == "searchPage"))
+        AND string.IsNullOrEmpty(ProductId)
+        AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0) ;
+
+OUTPUT SearchBlankProductIds TO SSTREAM @outputInterStreamForGets;
+
+OverallGets =  SELECT DateId,
+            COUNT (DISTINCT ImpressionGuid) AS OverallGetImpressions,
+            COUNT (DISTINCT CVRoot) AS OverallGetSessions
+    FROM inputData        
+    WHERE (AttemptedAcquisitionCount > 0 OR InstallClicks > 0) ;
+
+GetSummary = 
+    SELECT a.*,
+           b.OverallGetImpressions,
+           b.OverallGetSessions
+    FROM SearchGets AS a 
+         INNER JOIN OverallGets AS b 
+            ON a.DateId == b.DateId
+;
+
+OUTPUT GetSummary TO SSTREAM @outputStreamForGets
+CLUSTERED BY DateId
+SORTED BY DateId DESC;

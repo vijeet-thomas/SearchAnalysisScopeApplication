@@ -1,0 +1,35 @@
+﻿
+#DECLARE rootFolder string = @"/users/vijeetthomas/SearchConversionAnalysis/";
+#DECLARE inputBaseDataMarch string  = string.Format("{0}/BaseDataMarch.ss",@rootFolder);
+#DECLARE inputBaseDataApril string  = string.Format("{0}/BaseDataApril.ss",@rootFolder);
+#DECLARE outputUserData string  = string.Format("{0}/UserCountData.ss",@rootFolder);
+
+input =
+SELECT *
+FROM
+(
+    SSTREAM @inputBaseDataMarch
+);
+
+input2 =
+SELECT *
+FROM
+(
+    SSTREAM @inputBaseDataApril
+);
+
+userCountMarch =
+    SELECT COUNT(DISTINCT UserIdFull) AS UserCountMarch
+    FROM input;
+
+userCountApril =
+    SELECT COUNT(DISTINCT UserIdFull) AS UserCountApril
+    FROM input2;
+
+userCountSummary =
+    SELECT *
+    FROM userCountMarch
+    CROSS JOIN
+        userCountApril;
+
+OUTPUT userCountSummary TO SSTREAM @outputUserData;

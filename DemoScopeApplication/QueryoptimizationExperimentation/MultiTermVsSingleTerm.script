@@ -1,0 +1,53 @@
+﻿//Script GUID:a5e01d23-b99e-45e2-a816-bfa861b33764
+//Used for tracking history
+//Script GUID:e888b9d6-63e6-4c0f-992f-fd5574cdcfd9
+//Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 9), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-35);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/Search/QOptimizationMetrics/SingleVsMultiTerm";
+#DECLARE inputStreamMultiConversion = string.Format("{0}/MultiTermQueryCorrectedConversion_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE inputStreamSingleConversion = string.Format("{0}/SingleTermQueryCorrectedConversion_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputSingleTermVsMultiTerm = string.Format("{0}/SingleTermVsMultiTermCorrected_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputSingleTermVsMultiTermCsv = string.Format("{0}/SingleTermVsMultiTermCorrected_{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+
+
+inputMulti = 
+    SELECT * FROM (SSTREAM @inputStreamMultiConversion);
+
+inputSingle = 
+    SELECT * FROM (SSTREAM @inputStreamSingleConversion);
+
+MultitermResults =
+    SELECT  GroupName,
+            SUM(TotalSearches) AS TotalSearches,
+            SUM(Clicks) AS Clicks,
+            SUM(Installs) AS Installs,
+            SUM(ZeroSearches) AS ZeroSearches,
+            SUM(ZeroSearches)*100.0/SUM(TotalSearches) AS ZeroSearchesPercentage,
+            SUM(Installs)*100.0/SUM(TotalSearches) AS ConversionPercentage,
+            SUM(Clicks)*100.0/SUM(TotalSearches) AS CTRPercentage
+    FROM inputMulti;
+
+SingletermResults =
+    SELECT  GroupName,
+            SUM(TotalSearches) AS TotalSearches,
+            SUM(Clicks) AS Clicks,
+            SUM(Installs) AS Installs,
+            SUM(ZeroSearches) AS ZeroSearches,
+            SUM(ZeroSearches)*100.0/SUM(TotalSearches) AS ZeroSearchesPercentage,
+            SUM(Installs)*100.0/SUM(TotalSearches) AS ConversionPercentage,
+            SUM(Clicks)*100.0/SUM(TotalSearches) AS CTRPercentage
+    FROM inputSingle;
+
+AllResults = SELECT * FROM MultitermResults UNION ALL SELECT * FROM SingletermResults;
+
+OUTPUT AllResults TO SSTREAM @outputSingleTermVsMultiTerm;
+
+OUTPUT AllResults
+    TO @outputSingleTermVsMultiTermCsv
+    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);

@@ -1,0 +1,144 @@
+﻿//Script GUID:8f5e3915-0e1e-42d2-a69a-89e62801471c
+//Used for tracking history
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 6), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-29);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE inputStreamTop1000 string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/StoreSearches/TopSearches_YTD.ss";
+#DECLARE rootFolder string = @"/users/vijeetthomas/Search/QOptimizationMetrics";
+#DECLARE outputStreamTop1000Comparison = string.Format("{0}/Top1000SearchTermComparisonSessionLevel_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputStreamTop1000ComparisonCsv = string.Format("{0}/Top1000SearchTermComparisonSessionLevel_{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+
+inputSearchTerms =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputStreamTop1000
+    )
+    WHERE YearMonth == "202212";
+
+top1000 =
+    SELECT TOP 1000 SearchTerm, SearchCount
+    FROM inputSearchTerms
+    ORDER BY SearchCount DESC;
+
+inputData =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    )
+;
+
+BaseDataDailyQ0 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName LIKE "%SFA-EXP-d161b448ec%" 
+          AND Country IN ("FR","DE","MX","ES","BR")
+          ;
+
+BaseDataDailyQ0 = SELECT a.* FROM BaseDataDailyQ0 AS a INNER JOIN top1000 AS b ON a.SearchTerm == b.SearchTerm;
+
+BaseDataDailyQ1 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")  
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName NOT LIKE "%SFA-EXP-d161b448ec%"
+          AND Country IN ("FR","DE","MX","ES","BR")
+;
+
+BaseDataDailyQ1 = SELECT a.* FROM BaseDataDailyQ1 AS a INNER JOIN top1000 AS b ON a.SearchTerm == b.SearchTerm;
+
+SearchesDailyNewQuery =
+    SELECT SearchTerm,
+           COUNT(DISTINCT CVFull) AS TotalSearchesNewQuery
+    FROM BaseDataDailyQ0;
+
+SearchClicksAndInstallsDailyNew = SELECT SearchTerm, CVFull, ProductId,
+                            Math.Min(1, COUNT(DISTINCT CVFull) ) AS Clicks,
+                            Math.Min(1, SUM(AttemptedAcquisitionOrInstall) ) AS Installs
+                          FROM BaseDataDailyQ0
+                          WHERE IsClicked == 1;
+
+TotalClicksAndInstallsDailyNew =
+    SELECT SearchTerm,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstallsDailyNew;
+
+SearchesAggDailyNew = 
+    SELECT d.*,
+           b.TotalClicks AS ClicksNewQuery,
+           b.TotalInstalls AS InstallNewQuery
+    FROM SearchesDailyNewQuery AS d
+         INNER JOIN TotalClicksAndInstallsDailyNew AS b 
+         ON d.SearchTerm == b.SearchTerm
+         ;
+        
+SearchesTotalClicksInstallsAndSearchCountDailyNew =
+    SELECT DISTINCT *,
+           InstallNewQuery * 100.0 / ClicksNewQuery AS InstallsToClicksPercentageNewQuery,
+           InstallNewQuery * 100.0 / TotalSearchesNewQuery AS  ConversionPercentageNewQuery,
+           ClicksNewQuery * 100.0 / TotalSearchesNewQuery AS CTRPercentageNewQuery
+    FROM SearchesAggDailyNew;
+
+SearchesDailyOldQuery =
+    SELECT SearchTerm,
+           COUNT(DISTINCT CVFull) AS TotalSearchesOldQuery
+    FROM BaseDataDailyQ1;
+
+SearchClicksAndInstallsDailyOld = SELECT SearchTerm, CVFull, ProductId,
+                            Math.Min(1, COUNT(DISTINCT CVFull) ) AS Clicks,
+                            Math.Min(1, SUM(AttemptedAcquisitionOrInstall) ) AS Installs
+                          FROM BaseDataDailyQ1
+                          WHERE IsClicked == 1;
+
+TotalClicksAndInstallsDailyOld =
+    SELECT SearchTerm,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstallsDailyOld;
+
+SearchesAggDailyOld = 
+    SELECT d.*,
+           b.TotalClicks AS ClicksOldQuery,
+           b.TotalInstalls AS InstallsOldQuery
+    FROM SearchesDailyOldQuery AS d
+         INNER JOIN TotalClicksAndInstallsDailyOld AS b 
+         ON d.SearchTerm == b.SearchTerm
+         ;
+        
+SearchesTotalClicksInstallsAndSearchCountDailyOld =
+    SELECT DISTINCT *,
+           InstallsOldQuery * 100.0 / ClicksOldQuery AS InstallsToClicksPercentageOldQuery,
+           InstallsOldQuery * 100.0 / TotalSearchesOldQuery AS  ConversionPercentageOldQuery,
+           ClicksOldQuery * 100.0 / TotalSearchesOldQuery AS CTRPercentageOldQuery
+    FROM SearchesAggDailyOld;
+
+oldNewComparision =
+    SELECT a.*,
+           b.*.Except(SearchTerm)
+    FROM SearchesTotalClicksInstallsAndSearchCountDailyNew AS a
+    INNER JOIN
+        SearchesTotalClicksInstallsAndSearchCountDailyOld AS b
+        ON a.SearchTerm == b.SearchTerm;
+
+OUTPUT oldNewComparision TO SSTREAM @outputStreamTop1000Comparison
+  CLUSTERED BY SearchTerm
+        SORTED BY TotalSearchesNewQuery DESC, ClicksNewQuery DESC, InstallNewQuery DESC;
+
+OUTPUT oldNewComparision 
+    TO @outputStreamTop1000ComparisonCsv
+    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);

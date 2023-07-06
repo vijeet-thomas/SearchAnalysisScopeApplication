@@ -1,0 +1,99 @@
+﻿//Script GUID:21908551-b5db-4a82-a34d-8bbf04920870
+//Used for tracking history
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( - 7), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-29);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
+
+#DECLARE rootFolder string = @"/users/vijeetthomas/Search/QOptimizationMetrics";
+#DECLARE inputZeroResultsQ3string  = string.Format("{0}/Q3_Q0DiffFromQ2_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE inputDateZeroResults = string.Format("{0}/ZeroResultsPercentageDiff_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputStreamZeroComparison = string.Format("{0}/ZeroSearchTermComparison{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+#DECLARE outputStreamZeroComparisonCsv = string.Format("{0}/ZeroSearchTermComparison{1:yyyy}_{1:MM}_{1:dd}.csv",@rootFolder,@endDate);
+
+SearchTerms = SELECT * FROM (SSTREAM @inputDateZeroResults) WHERE PercentageDiff > 10 AND ZeroSeacrhesNewPercentage > 10;
+
+SearchTerms = SELECT SearchTerm,
+                     SUM (ZeroSearchesNewQuery ) AS ZeroSearchesNewQuery,
+                     SUM (TotalSearchesNewQuery ) AS TotalSearchesNewQuery,
+                     SUM (ZeroSearchesOldQuery ) AS ZeroSearchesOldQuery,
+                     SUM (TotalSearchesOldQuery ) AS TotalSearchesOldQuery
+                     FROM SearchTerms;
+
+SearchTerms = SELECT *,
+                     (ZeroSearchesNewQuery*100.0/  TotalSearchesNewQuery)  AS ZeroSearchesNewPercentage,
+                     (ZeroSearchesOldQuery*100.0/  TotalSearchesOldQuery)  AS ZeroSearchesOldPercentage,
+                     ( (ZeroSearchesNewQuery*100.0/  TotalSearchesNewQuery) - (ZeroSearchesOldQuery*100.0/  TotalSearchesOldQuery) )  AS PercentageDiff        
+              FROM SearchTerms;
+
+inputData =
+    VIEW @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation/ExperimentationSearchProduct.view"
+    PARAMS
+    (
+        StartDate = @startDate1DayString,
+        EndDate = @endDateString
+    )
+;
+
+BaseDataDailyQ0 =
+    SELECT *
+    FROM inputData
+    WHERE 
+          AppVer IN ("22210","22209","22211")   
+          AND SearchType == "Regular"
+          AND DeviceClass == "Windows.Desktop"
+          AND SearchTerm.Length > 0
+          AND FlightName NOT LIKE "%SFA-EXP-d161b448ec%" 
+          AND Country IN ("FR","DE","MX","ES","BR")
+          ;
+
+BaseDataDailyQ0 = SELECT a.*
+                  FROM BaseDataDailyQ0 AS a 
+                       INNER JOIN SearchTerms AS b ON a.SearchTerm == b.SearchTerm;
+
+SearchesDailyOldQuery =
+    SELECT SearchTerm,
+           COUNT(DISTINCT PageImpressionGuid) AS TotalSearchesOldQuery
+    FROM BaseDataDailyQ0;
+
+SearchClicksAndInstallsDailyOld = SELECT SearchTerm, PageImpressionGuid, ProductId,
+                            Math.Min(1, COUNT(DISTINCT PageImpressionGuid) ) AS Clicks,
+                            Math.Min(1, SUM(AttemptedAcquisitionOrInstall) ) AS Installs
+                          FROM BaseDataDailyQ0
+                          WHERE IsClicked == 1;
+
+TotalClicksAndInstallsDailyOld =
+    SELECT SearchTerm,
+           SUM(Clicks) AS TotalClicks,
+           SUM(Installs) AS TotalInstalls
+    FROM SearchClicksAndInstallsDailyOld;
+
+SearchesAggDailyOld = 
+    SELECT d.*,
+           b.TotalClicks AS ClicksOldQuery,
+           b.TotalInstalls AS InstallsOldQuery
+    FROM SearchesDailyOldQuery AS d
+         INNER JOIN TotalClicksAndInstallsDailyOld AS b 
+         ON d.SearchTerm == b.SearchTerm
+         ;
+        
+SearchesTotalClicksInstallsAndSearchCountDailyOld =
+    SELECT DISTINCT *,
+           InstallsOldQuery * 100.0 / ClicksOldQuery AS InstallsToClicksPercentageOldQuery,
+           InstallsOldQuery * 100.0 / TotalSearchesOldQuery AS  ConversionPercentageOldQuery,
+           ClicksOldQuery * 100.0 / TotalSearchesOldQuery AS CTRPercentageOldQuery
+    FROM SearchesAggDailyOld;
+
+//FinalSearchesData = 
+//    SELECT  a.*,
+//            b.ZeroSearchesNewQuery, 
+//            b.TotalSearchesNewQuery
+//  FROM SearchesTotalClicksInstallsAndSearchCountDailyOld AS a INNER JOIN BaseDataDailyQ0 AS b ON a.SearchTerm == b.SearchTerm;
+
+OUTPUT SearchesTotalClicksInstallsAndSearchCountDailyOld TO SSTREAM @outputStreamZeroComparison
+  CLUSTERED BY SearchTerm
+        SORTED BY TotalSearchesOldQuery DESC, ClicksOldQuery DESC, InstallsOldQuery DESC;
+
+OUTPUT SearchesTotalClicksInstallsAndSearchCountDailyOld 
+    TO @outputStreamZeroComparisonCsv
+    USING DefaultTextOutputter(outputHeader : true, delimiter: ',', encoding: Encoding.UTF8);
