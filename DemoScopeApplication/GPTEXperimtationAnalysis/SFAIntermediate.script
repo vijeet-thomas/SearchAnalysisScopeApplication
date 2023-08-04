@@ -1,0 +1,71 @@
+﻿
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// Nebula parameters
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+SET @@FeaturePreviews = "EnableJsonOperators:on,EnableJsonIntrinsics:on";
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+// References
+// -----------------------------------------------------------------------------------------------------------------------------------------------------------
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/Libraries/netstandard.dll";
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/Libraries/Newtonsoft.Json.dll";
+
+USING Newtonsoft.Json;
+USING Newtonsoft.Json.Converters;
+USING Newtonsoft.Json.Linq;
+
+
+#DECLARE firstDay DateTime = new DateTime(2023, 5, 27);
+#DECLARE lastDay DateTime = new DateTime(2023, 6, 16);
+#DECLARE firstDayString string = @firstDay.ToString("yyyy-MM-dd");
+#DECLARE lastDayString string = @lastDay.ToString("yyyy-MM-dd");
+
+#DECLARE outputRoot string = @"users/vijeetthomas/GPT-AIEnrichedTermsAnalysis/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/SFA_Intermediate_Stream.ss", @outputRoot);
+
+#DECLARE streamExpiryString string = "60";
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+
+PIStream =
+    VIEW @SFAView 
+    PARAMS 
+    (
+        startDate = @firstDayString,
+        endDate = @lastDayString
+    );
+
+BaseDataTreatment = SELECT DateId, PageName, Nav_AreaName, 
+                           Actions.Trim().Substring(1, Actions.Length-2) AS  Actions, 
+                           Nav_ContentProductId, CVRoot, ImpressionGuid, Flights, Uri,
+                           ReferrerUri, ProductId, Nav_ContentName, Ref_AreaName, Ref_PageName, 
+                           AttemptedAcquisitionCount,
+                           InstallClicks
+    FROM PIStream
+    WHERE !string.IsNullOrEmpty(Actions);
+
+SplitRows =
+    SELECT *.Except(Actions)
+    FROM BaseDataTreatment
+         CROSS APPLY Actions.Trim().Split('}') AS ActionsSplit;
+
+FinalOutput =
+    SELECT *.Except(ActionsSplit),
+           (Helper.GetCorrectedJson(ActionsSplit.Trim()) + "}") AS Actions
+    FROM SplitRows
+    WHERE !string.IsNullOrEmpty(ActionsSplit.Trim());
+
+OUTPUT FinalOutput TO SSTREAM @outputStreamPerSearch
+                   WITH STREAMEXPIRY "60";
+
+#CS
+
+public static class Helper
+{
+    public static string GetCorrectedJson ( string data) {
+        if (!string.IsNullOrEmpty(data) && data.Length > 2 && data.StartsWith(",")) {
+            return data.Substring(2);
+        }
+        return data;
+    }
+}
+    
+#ENDCS

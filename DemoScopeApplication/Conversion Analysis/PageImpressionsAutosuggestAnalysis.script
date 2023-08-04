@@ -3,12 +3,12 @@
 // Used for tracking history
 
 
-#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -10), DateTime.Parse("@@endDate@@"));
-#DECLARE startDate1Day DateTime = @endDate;
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-7);
 #DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
 #DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
-#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/SearchTermAnalysis/";
-#DECLARE outputStreamPerSearch string = string.Format("{0}/SFA_PageImpressions_AutoSuggestAnalysis2.ss", @outputRoot);
+#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_22305/July_24_Autosuggest";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/SFA_PageImpressions_AutoSuggestAnalysis.ss", @outputRoot);
 #DECLARE streamExpiryString string = "60";
 #DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
 
@@ -22,14 +22,14 @@ inputData =
 
 AllSearches =
     SELECT *
-    FROM inputData;
+    FROM inputData
     WHERE MajorBuildNumber == 22305;
 
 Searches = SELECT DateId,
-           COUNT (DISTINCT ImpressionGuid) AS SearchImpressions,
+            COUNT (DISTINCT ImpressionGuid) AS SearchImpressions,
            COUNT (DISTINCT CVRoot) AS SearchSessions
     FROM AllSearches
-    WHERE Nav_AreaName == "AutoSuggest" OR (PageName == "pdp" AND Ref_AreaName == "AutoSuggest");
+    WHERE Nav_CustomAttribute_2 == "AutoSuggest";
 
 Clicks = SELECT DateId,
            COUNT (DISTINCT ImpressionGuid) AS ClicksImpressions,
@@ -51,7 +51,8 @@ SearchSummary =
            (ClicksImpressions*100.0/SearchImpressions) AS CTRImpressions,
            (InstallsImpressions*100.0/SearchImpressions) AS ConversionImpressions,
            (ClicksSessions*100.0/SearchSessions) AS CTRSessions,
-           (InstallSessions*100.0/SearchSessions) AS ConversionSessions
+           (InstallSessions*100.0/SearchSessions) AS ConversionSessions,
+           RANK() OVER(ORDER BY SearchImpressions DESC) AS RankBySearchCount 
     FROM Searches AS a 
          INNER JOIN Clicks AS b 
             ON a.DateId == b.DateId
@@ -61,4 +62,4 @@ SearchSummary =
 
 OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch
 CLUSTERED BY DateId
-SORTED BY DateId DESC;
+SORTED BY SearchImpressions DESC;

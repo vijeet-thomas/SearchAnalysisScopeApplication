@@ -1,0 +1,62 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:1010a08a-4faa-4941-bb81-19d6f8b3d3e0
+// Used for tracking history
+//
+
+#DECLARE firstDay DateTime = new DateTime(2023, 6, 18);
+#DECLARE lastDay DateTime = new DateTime(2023, 6, 23);
+#DECLARE firstDayString string = @firstDay.ToString("yyyy-MM-dd");
+#DECLARE lastDayString string = @lastDay.ToString("yyyy-MM-dd");
+
+#DECLARE outputRoot string = @"users/vijeetthomas/ConversionNumbers/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/ProductSuccesfulAcquisitionsAnalysis.ss", @outputRoot);
+#DECLARE streamExpiryString string = "60";
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+
+inputData =
+    VIEW @SFAView
+    PARAMS
+    (
+        startDate = @firstDayString,
+        endDate = @lastDayString
+    );
+
+AllSearches =
+    SELECT *
+    FROM inputData
+    WHERE ProductId == "9NCBCSZSJRSB";
+
+Searches = SELECT DateId,
+                  ProductId,
+                  COUNT (DISTINCT ImpressionGuid) AS AllViews,
+                  COUNT (DISTINCT CVRoot) AS ViewSessions
+    FROM AllSearches;
+
+AttemptedAcquisitions = SELECT DateId,
+                ProductId,
+               COUNT (DISTINCT ImpressionGuid) AS AllAttemptedAcquisitions,
+               COUNT (DISTINCT CVRoot) AS AttemptedAcquisitionsSessions
+        FROM AllSearches
+        WHERE (AttemptedAcquisitionCount > 0 OR InstallClicks > 0);
+
+SuccessfulAcquisitions = SELECT DateId,
+                ProductId,
+               COUNT (DISTINCT ImpressionGuid) AS AllSuccessfulAcquisitions,
+               COUNT (DISTINCT CVRoot) AS SuccessfulAcquisitionsSessions
+        FROM AllSearches
+        WHERE (SuccessfulAcquisitionCount > 0);
+
+SearchSummary = 
+    SELECT a.*,
+           b.*.Except(DateId,ProductId),
+           c.*.Except(DateId,ProductId)
+    FROM Searches AS a 
+         INNER JOIN AttemptedAcquisitions AS b 
+            ON a.DateId == b.DateId AND a.ProductId == b.ProductId
+         INNER JOIN SuccessfulAcquisitions AS c
+            ON a.DateId == c.DateId AND a.ProductId == c.ProductId
+;
+
+OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch
+CLUSTERED BY DateId
+SORTED BY DateId DESC;

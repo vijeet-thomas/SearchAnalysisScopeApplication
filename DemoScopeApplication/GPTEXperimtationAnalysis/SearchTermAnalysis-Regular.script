@@ -1,0 +1,126 @@
+﻿
+
+#DECLARE firstDay DateTime = new DateTime(2023, 5, 27);
+#DECLARE lastDay DateTime = new DateTime(2023, 6, 16);
+#DECLARE firstDayString string = @firstDay.ToString("yyyy-MM-dd");
+#DECLARE lastDayString string = @lastDay.ToString("yyyy-MM-dd");
+
+#DECLARE inputFile string = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/Test/ProductId-NameMapping.csv";
+#DECLARE outputRoot string = @"users/vijeetthomas/GPT-AIEnrichedTermsAnalysis/";
+#DECLARE inputStreamPerSearch string = string.Format("{0}/SFA_Intermediate_Stream.ss", @outputRoot);
+
+#DECLARE outputStreamPerSearch string = string.Format("{0}/RegularSearchTermAnalysis2.ss", @outputRoot);
+#DECLARE temp string = string.Format("{0}/SummaryTreatment.ss", @outputRoot);
+
+#DECLARE streamExpiryString string = "60";
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+
+//FilteredIds = 
+//    EXTRACT ProductId : string
+//    FROM @inputFile
+//    USING DefaultTextExtractor(delimiter: ',');
+//
+//DistinctProductIds =
+//    SELECT DISTINCT ProductId
+//    FROM FilteredIds;
+
+//PIStream =
+//    VIEW @SFAView 
+//    PARAMS 
+//    (
+//        startDate = @firstDayString,
+//        endDate = @lastDayString
+//    );
+
+PIStream = SELECT * FROM (SSTREAM @inputStreamPerSearch);
+
+BaseDataTreatment = SELECT *
+    FROM PIStream
+    WHERE (PageName == "searchPage" OR (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList"))
+          AND Flights.Contains("VAS_EXP_AiSearchTermV2") 
+          AND !Flights.Contains("VAS_EXP_AiSearchTermV2:false") ;
+
+SearchesT = SELECT
+           Uri.Split(new string[] { "query=" }, StringSplitOptions.None)[1].Split('&')[0].ToLower().Trim() AS SearchTermT,
+           COUNT(DISTINCT ImpressionGuid) AS SearchImpressionsT
+FROM BaseDataTreatment
+WHERE PageName  == "searchPage"
+      AND Uri IS NOT NULL AND Uri.Contains("pages/search?")
+      AND Uri.Contains("query=");
+
+ClicksT = SELECT  ReferrerUri.Split(new string[] { "query=" }, StringSplitOptions.None)[1].Split('&')[0].ToLower().Trim() AS SearchTermT,
+           COUNT (DISTINCT ImpressionGuid) AS ClicksImpressionsT
+    FROM BaseDataTreatment
+    WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList")
+          AND ReferrerUri IS NOT NULL
+          AND ReferrerUri.Contains("query="); 
+
+InstallsT =
+    SELECT ReferrerUri.Split(new string[] { "query=" }, StringSplitOptions.None)[1].Split('&')[0].ToLower().Trim() AS SearchTermT,
+           COUNT(DISTINCT ImpressionGuid) AS InstallsImpressionsT
+    FROM BaseDataTreatment
+    WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList")
+          AND ReferrerUri IS NOT NULL
+          AND ReferrerUri.Contains("query=")
+          AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0);
+
+SearchSummaryTreatment = 
+    SELECT a.*,
+           b.*.Except(SearchTermT),
+           c.*.Except(SearchTermT)
+    FROM SearchesT AS a INNER JOIN 
+         ClicksT AS b 
+            ON a.SearchTermT == b.SearchTermT
+         INNER JOIN InstallsT AS c
+            ON a.SearchTermT == c.SearchTermT;
+
+//----------------------------
+
+BaseDataControl =
+    SELECT *
+    FROM PIStream
+    WHERE (PageName == "searchPage" OR (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList"))
+    AND Flights.Contains("VAS_EXP_AiSearchTermV2:false");
+
+SearchesC = SELECT
+           Uri.Split(new string[] { "query=" }, StringSplitOptions.None)[1].Split('&')[0].ToLower().Trim() AS SearchTermC,
+           COUNT(DISTINCT ImpressionGuid) AS SearchImpressionsC
+FROM BaseDataControl
+WHERE PageName  == "searchPage"
+      AND Uri IS NOT NULL AND Uri.Contains("pages/search?")
+      AND Uri.Contains("query=");
+
+ClicksC = SELECT ReferrerUri.Split(new string[] { "query=" }, StringSplitOptions.None)[1].Split('&')[0].ToLower().Trim() AS SearchTermC, 
+           COUNT (DISTINCT ImpressionGuid) AS ClicksImpressionsC
+    FROM BaseDataControl
+    WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList")
+          AND ReferrerUri IS NOT NULL
+          AND ReferrerUri.Contains("query="); 
+
+InstallsC =
+    SELECT ReferrerUri.Split(new string[] { "query=" }, StringSplitOptions.None)[1].Split('&')[0].ToLower().Trim() AS SearchTermC,
+           COUNT(DISTINCT ImpressionGuid) AS InstallsImpressionsC
+    FROM BaseDataControl
+     WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList")
+          AND ReferrerUri IS NOT NULL
+          AND ReferrerUri.Contains("query=")
+          AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0);
+
+SearchSummaryControl = 
+    SELECT a.*,
+           b.*.Except(SearchTermC),
+           c.*.Except(SearchTermC)
+    FROM SearchesC AS a INNER JOIN
+         ClicksC AS b 
+            ON a.SearchTermC == b.SearchTermC
+         INNER JOIN InstallsC AS c
+            ON a.SearchTermC == c.SearchTermC;
+
+FinalOverviewOutput = 
+    SELECT b.*, a.*
+    FROM SearchSummaryTreatment AS a 
+         LEFT OUTER JOIN SearchSummaryControl AS b 
+         ON a.SearchTermT == b.SearchTermC;
+
+OUTPUT FinalOverviewOutput
+TO SSTREAM @outputStreamPerSearch;

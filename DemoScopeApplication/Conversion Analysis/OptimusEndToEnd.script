@@ -1,5 +1,5 @@
 ﻿// Copyright (C) Microsoft Corporation. All rights reserved.
-// Script GUID:745e5ef9-3916-4d56-9c79-1796a47e7675
+// Script GUID:2ff16528-3520-427f-a8d7-cffea115d227
 // Used for tracking history
 
 
@@ -7,9 +7,9 @@
 #DECLARE startDate DateTime = @endDate.AddDays(-7);
 #DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
 #DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
-#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_22305/July_24_Regular";
-#DECLARE outputStreamPerSearch string = string.Format("{0}/OptimusSearchProduct_RegularAnalysis.ss", @outputRoot);
-#DECLARE outputStreamPerSearch2 string = string.Format("{0}/ConversionAnalysisAlternate.ss", @outputRoot);
+//#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_22305/";
+#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/OptimusSearchProduct_EndToEndAnalysis.ss", @outputRoot);
 #DECLARE streamExpiryString string = "60";
 #DECLARE SearchProductView string = @"/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs/SearchProduct/SearchProduct.view";
 
@@ -25,8 +25,10 @@ BaseDataDaily =
     SELECT *
     FROM inputData
     WHERE
-    SearchType == "Regular" AND !string.IsNullOrEmpty(ImpressionGuid)
-          AND AppVersion.Split('.')[0] == "22305";
+    (SearchType == "Regular"
+    OR (SearchType == "AutoSuggest"
+    AND IsClicked > 0 AND !string.IsNullOrEmpty(ProductId) AND !string.IsNullOrEmpty(PDP_ImpressionGuid)) );
+         // AND AppVersion.Split('.')[0] == "22305";
 
 SearchesDaily =
     SELECT DateId,

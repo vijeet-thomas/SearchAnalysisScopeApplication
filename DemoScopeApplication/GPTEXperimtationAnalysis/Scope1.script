@@ -1,0 +1,108 @@
+﻿
+
+#DECLARE firstDay DateTime = new DateTime(2023, 5, 27);
+#DECLARE lastDay DateTime = new DateTime(2023, 6, 16);
+#DECLARE firstDayString string = @firstDay.ToString("yyyy-MM-dd");
+#DECLARE lastDayString string = @lastDay.ToString("yyyy-MM-dd");
+
+#DECLARE inputFile string = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/Test/ProductId-NameMapping.csv";
+#DECLARE outputRoot string = @"users/vijeetthomas/GPT-AIEnrichedTermsAnalysis/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/ProductAnalysis_EndToEnd.ss", @outputRoot);
+#DECLARE distinctoutputStream string = string.Format("{0}/DistinctProductIds.ss", @outputRoot);
+
+#DECLARE streamExpiryString string = "60";
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+
+FilteredIds = 
+    EXTRACT ProductId : string
+    FROM @inputFile
+    USING DefaultTextExtractor(delimiter: ',');
+
+DistinctProductIds =
+    SELECT DISTINCT ProductId
+    FROM FilteredIds;
+
+PIStream =
+    VIEW @SFAView 
+    PARAMS 
+    (
+        startDate = @firstDayString,
+        endDate = @lastDayString
+    );
+
+
+BaseDataTreatment =
+    SELECT *
+    FROM PIStream
+    WHERE Flights.Contains("VAS_EXP_AiSearchTermV2") AND !Flights.Contains("VAS_EXP_AiSearchTermV2:false");
+
+ClicksT = SELECT ProductId,
+           COUNT (DISTINCT ImpressionGuid) AS ClicksImpressionsT
+    FROM BaseDataTreatment
+    WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList") OR ( PageName == "pdp" AND Ref_AreaName == "AutoSuggest"); 
+
+InstallsT =
+    SELECT ProductId,
+           COUNT(DISTINCT ImpressionGuid) AS InstallsImpressionsT
+    FROM BaseDataTreatment
+    WHERE (
+               (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList") //Regular    
+                OR (PageName == "pdp" AND Ref_AreaName == "AutoSuggest") //Autosuggest
+          ) 
+          AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0);
+
+SearchSummaryTreatment =
+    SELECT a.*,
+           b.*.Except(ProductId)
+    FROM ClicksT AS a 
+         LEFT JOIN InstallsT AS b 
+            ON a.ProductId == b.ProductId
+;
+
+
+//----------------------------
+
+BaseDataControl =
+    SELECT *
+    FROM PIStream
+    WHERE Flights.Contains("VAS_EXP_AiSearchTermV2:false");
+
+ClicksC = SELECT ProductId,
+           COUNT (DISTINCT ImpressionGuid) AS ClicksImpressionsC
+    FROM BaseDataControl
+    WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList") OR ( PageName == "pdp" AND Ref_AreaName == "AutoSuggest");
+
+InstallsC =
+    SELECT ProductId,
+           COUNT(DISTINCT ImpressionGuid) AS InstallsImpressionsC
+    FROM BaseDataControl
+    WHERE (
+              (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList") //Regular
+              OR (PageName == "pdp" AND Ref_AreaName == "AutoSuggest") //Autosuggest
+          ) 
+          AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0);
+
+SearchSummaryControl =
+    SELECT a.*,
+           b.*.Except(ProductId)
+    FROM ClicksC AS a
+         LEFT JOIN
+             InstallsC AS b
+         ON a.ProductId == b.ProductId;
+
+FinalOverviewOutput = SELECT b.*, a.*.Except(ProductId) FROM SearchSummaryTreatment AS a OUTER JOIN SearchSummaryControl AS b ON a.ProductId == b.ProductId;
+
+CountTotalDistinct = SELECT COUNT(DISTINCT ProductId) AS TotalDistinct FROM FinalOverviewOutput;
+
+FilteredData =
+    SELECT a.ProductId,
+           b.*.Except(ProductId)
+    FROM FilteredIds AS a
+         LEFT JOIN
+             FinalOverviewOutput AS b
+         ON a.ProductId == b.ProductId;
+
+
+OUTPUT FilteredData TO SSTREAM @outputStreamPerSearch
+CLUSTERED BY ProductId
+SORTED BY ProductId DESC;

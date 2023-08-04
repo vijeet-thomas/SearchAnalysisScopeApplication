@@ -1,0 +1,29 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:184d402c-6f4f-49b2-8992-ced5db885257
+// Used for tracking history
+#DECLARE firstDay DateTime = new DateTime(2023, 2, 08);
+#DECLARE lastDay DateTime = new DateTime(2023, 2, 12);
+#DECLARE firstDayString string = @firstDay.ToString("yyyy-MM-dd");
+#DECLARE lastDayString string = @lastDay.ToString("yyyy-MM-dd");
+
+#DECLARE inputFile string = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/Test/ProductId-NameMapping.csv";
+#DECLARE outputRoot string = @"users/vijeetthomas/GPT-AIEnrichedTermsAnalysis/";
+#DECLARE streamExpiryString string = "60";
+#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/BaseCvsForExperimentation.ss", @outputRoot);
+
+PIStream =
+    VIEW @SFAView 
+    PARAMS 
+    (
+        startDate = @firstDayString,
+        endDate = @lastDayString
+    );
+
+AllStreams =
+    SELECT *
+    FROM PIStream
+    WHERE CVRoot IN("EcYmm98b30SxVgQSn/Sm4g", "NRPWhvVJTkO+uPdv0KfaPw", "ApvqSrSxUky7tSu+XoRonw", "xgnp6mGBlkmrUR9nK8dcKg", "ArZ706sW9UmBBD/UZVKZ0Q",
+          "tD1rwcppbkqfBY1g5j01DQ", "HCuC9ImMYUGztcnfgc0BIA", "GhnFOjBffU2qboy6NwyA3A", "PCnhlNZAdUCd0BIAaF+hVQ");
+
+OUTPUT AllStreams TO SSTREAM @outputStreamPerSearch WITH STREAMEXPIRY @streamExpiryString;

@@ -1,0 +1,98 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:5d4ff360-799c-4cab-a631-6ddfdf252d30
+// Used for tracking history
+// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:1010a08a-4faa-4941-bb81-19d6f8b3d3e0
+// Used for tracking history
+//
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/Libraries/netstandard.dll";
+REFERENCE @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/Libraries/Newtonsoft.Json.dll";
+
+USING Newtonsoft.Json;
+USING Newtonsoft.Json.Converters;
+USING Newtonsoft.Json.Linq;
+
+#DECLARE outputRoot string = @"users/vijeetthomas/GPT-AIEnrichedTermsAnalysis/";
+#DECLARE inputStreamPerSearch string = string.Format("{0}/SFA_Intermediate_Stream.ss", @outputRoot);
+
+#DECLARE streamExpiryString string = "60";
+
+#DECLARE outputAutoSuggestSearch string = string.Format("{0}/Autosuggest_ParsedStream_Teams.ss", @outputRoot);
+SET @@FeaturePreviews = "EnableJsonIntrinsics:on";
+
+Searches =
+    SELECT *
+    FROM
+    (
+        SSTREAM @inputStreamPerSearch
+    );
+
+AutoSuggestSearches = 
+    SELECT *.Except(Actions,AttemptedAcquisitionCount,InstallClicks),
+           Actions.Trim() AS Actions
+    FROM Searches 
+    WHERE Nav_AreaName == "AutoSuggest"
+    AND Nav_ContentProductId == "9NBLGGH5L9XT";
+
+AutoSuggestInstalls =
+    SELECT ProductId,
+           CVRoot,
+           ImpressionGuid,
+           AttemptedAcquisitionCount,
+           InstallClicks
+    FROM Searches
+    WHERE PageName == "pdp" AND Ref_AreaName == "AutoSuggest"
+          AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0)
+          AND ProductId == "9NBLGGH5L9XT";
+
+AllSearches = 
+    SELECT *,
+           ScopeJson.Parse<string> (input:Actions, path:"contentId") AS ActionsContentId,
+           ScopeJson.Parse<string> (Actions, "contentName") AS ActionsContentName
+    FROM AutoSuggestSearches
+    WHERE !string.IsNullOrEmpty(Actions) AND Actions.Contains("contentName")
+    AND Actions.Contains("contentId");
+
+AllSearches = SELECT * FROM AllSearches WHERE ActionsContentId == "SearchTerm";
+
+CombinedData =
+    SELECT a.*,
+           (b.AttemptedAcquisitionCount IS NULL ? 0 : b.AttemptedAcquisitionCount) AS AttemptedAcquisitionCount, 
+           (b.InstallClicks IS NULL ? 0 : b.InstallClicks) AS InstallClicks
+    FROM AllSearches AS a
+    LEFT JOIN
+        AutoSuggestInstalls AS b
+        ON a.Nav_ContentProductId == b.ProductId AND a.CVRoot == b.CVRoot;
+
+ClicksTreatment =
+    SELECT 
+           ActionsContentName.Trim().ToLower() AS SearchTermTreatment,
+           Nav_ContentProductId,
+           COUNT(DISTINCT ImpressionGuid) AS ClicksImpressionsTreatment,
+           COUNT(DISTINCT CVRoot) AS ClicksSessionsTreatment,
+           COUNTIF(AttemptedAcquisitionCount > 0 OR InstallClicks > 0) AS InstallsTreatment
+    FROM CombinedData
+    WHERE Flights.Contains("VAS_EXP_AiSearchTermV2") AND !Flights.Contains("VAS_EXP_AiSearchTermV2:false"); 
+
+ClicksControl =
+    SELECT ActionsContentName.Trim().ToLower() AS SearchTermControl,
+           Nav_ContentProductId,
+           COUNT(DISTINCT ImpressionGuid) AS ClicksImpressionsControl,
+           COUNT(DISTINCT CVRoot) AS ClicksSessionsControl,
+           COUNTIF(AttemptedAcquisitionCount > 0 OR InstallClicks > 0) AS InstallsControl
+    FROM CombinedData
+    WHERE Flights.Contains("VAS_EXP_AiSearchTermV2:false"); 
+
+SearchSummary = 
+    SELECT a.*,
+           b.*.Except(Nav_ContentProductId)
+    FROM ClicksTreatment AS a 
+         OUTER JOIN ClicksControl AS b 
+            ON a.Nav_ContentProductId == b.Nav_ContentProductId
+            AND a.SearchTermTreatment == b.SearchTermControl
+;
+
+OUTPUT SearchSummary TO SSTREAM @outputAutoSuggestSearch
+                              CLUSTERED BY Nav_ContentProductId
+                              SORTED BY ClicksImpressionsTreatment DESC;
+                              ;

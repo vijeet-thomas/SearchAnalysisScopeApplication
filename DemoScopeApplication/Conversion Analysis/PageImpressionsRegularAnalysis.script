@@ -3,11 +3,11 @@
 // Used for tracking history
 
 
-#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -5), DateTime.Parse("@@endDate@@"));
-#DECLARE startDate1Day DateTime = @endDate.AddDays(-10);
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate1Day DateTime = @endDate.AddDays(-7);
 #DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
 #DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
-#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_22305/";
+#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_22305/July_24_Regular";
 #DECLARE outputStreamPerSearch string = string.Format("{0}/SFA_PageImpressions_RegularAnalysis.ss", @outputRoot);
 #DECLARE streamExpiryString string = "60";
 #DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
@@ -30,7 +30,7 @@ Searches = SELECT DateId,
            COUNT (DISTINCT ImpressionGuid) AS SearchImpressions,
            COUNT (DISTINCT CVRoot) AS SearchSessions
     FROM AllSearches
-    WHERE PageName == "searchPage" AND Nav_AreaName == "SearchVerticalTileList";
+    WHERE PageName == "searchPage";
 
 Clicks = SELECT DateId,
            COUNT (DISTINCT ImpressionGuid) AS ClicksImpressions,
@@ -43,7 +43,7 @@ Installs = SELECT DateId,
            COUNT (DISTINCT CVRoot) AS InstallSessions
     FROM AllSearches
     WHERE PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList"
-        AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0) ;
+        AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0)  ;
 
 SearchSummary = 
     SELECT a.*,

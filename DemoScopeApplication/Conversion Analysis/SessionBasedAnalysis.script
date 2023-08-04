@@ -1,0 +1,26 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:aac88c07-d6d8-464c-aaa0-4307b5b3b399
+// Used for tracking history
+#DECLARE optimusInput string = "/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs/Search/2023/06/SearchProduct_With_Flights_2023_06_25.ss";
+#DECLARE SFAInput string = "/shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/2023/06/SFA_PageImpressions_2023_06_25.ss";
+#DECLARE outputStream string = "/shares/asimov.prod.data/PublicPartner/Processed/MSOW/dev/ClickImpressionGuidsDifferences.ss";
+#DECLARE outputStream2 string = "/shares/asimov.prod.data/PublicPartner/Processed/MSOW/dev/ClickImpressionGuidsCount.ss";
+
+sfa = SELECT * FROM (SSTREAM @SFAInput) WHERE (AttemptedAcquisitionCount > 0 OR InstallClicks > 0) AND (Nav_AreaName == "AutoSuggest" OR (PageName == "pdp" AND Ref_AreaName == "AutoSuggest"));
+
+optimus = SELECT * FROM (SSTREAM @optimusInput) WHERE (IsAttemptedAcquisition > 0) AND SearchType == "AutoSuggest"
+    AND IsClicked > 0 AND !string.IsNullOrEmpty(ProductId);
+
+joinData =
+    SELECT optimus.ImpressionGuid, optimus.SearchTerm, optimus.IsAttemptedAcquisition, optimus.CVRoot
+    FROM optimus
+     LEFT ANTISEMIJOIN
+        sfa
+        ON optimus.ImpressionGuid == sfa.ImpressionGuid;
+
+summary =
+    SELECT COUNT(DISTINCT ImpressionGuid) AS CountImpressions
+    FROM joinData;
+
+OUTPUT joinData TO SSTREAM @outputStream;
+OUTPUT summary TO SSTREAM @outputStream2;

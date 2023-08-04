@@ -40,13 +40,23 @@
     <Script Include="AndroidRnRExtract.script" />
     <Script Include="AppVerUserDistribution.script" />
     <Script Include="ComparisonStream.script" />
+    <Script Include="Conversion Analysis\OptimusEndToEnd.script" />
+    <Script Include="Conversion Analysis\PageImpressionProduct.script" />
+    <Script Include="Conversion Analysis\PageImpressionEndToEnd.script" />
     <Script Include="Conversion Analysis\PageImpressionsAutosuggestAnalysis.script" />
     <Script Include="Conversion Analysis\OptimusAutosuggestAnalysis.script" />
     <Script Include="Conversion Analysis\OptimusRegularAnalysis.script" />
     <Script Include="Conversion Analysis\PageImpressionsRegularAnalysis.script" />
     <Script Include="Conversion Analysis\ConversionUniversalStoreAnalysis.script" />
+    <Script Include="Conversion Analysis\SessionBasedAnalysis.script" />
+    <Script Include="Conversion Analysis\SFAParseActions.script" />
     <Script Include="ConversionOptimusAnalysis.script" />
     <Script Include="ConversionOSAnalysis.script" />
+    <Script Include="GPTEXperimtationAnalysis\BaseStreamCreation.script" />
+    <Script Include="GPTEXperimtationAnalysis\ParseAutosuggestJson.script" />
+    <Script Include="GPTEXperimtationAnalysis\Scope1.script" />
+    <Script Include="GPTEXperimtationAnalysis\SearchTermAnalysis-Regular.script" />
+    <Script Include="GPTEXperimtationAnalysis\SFAIntermediate.script" />
     <Script Include="PageImpressionsGetsAnalysis.script" />
     <Script Include="ConversionSFAAnalysis.script" />
     <Script Include="InApps_Revenue_v2.script" />
@@ -161,6 +171,15 @@
     <ScriptCode Include="ComparisonStream.script.cs">
       <DependentUpon>ComparisonStream.script</DependentUpon>
     </ScriptCode>
+    <ScriptCode Include="Conversion Analysis\OptimusEndToEnd.script.cs">
+      <DependentUpon>Conversion Analysis\OptimusEndToEnd.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Conversion Analysis\PageImpressionProduct.script.cs">
+      <DependentUpon>Conversion Analysis\PageImpressionProduct.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Conversion Analysis\PageImpressionEndToEnd.script.cs">
+      <DependentUpon>Conversion Analysis\PageImpressionEndToEnd.script</DependentUpon>
+    </ScriptCode>
     <ScriptCode Include="Conversion Analysis\PageImpressionsAutosuggestAnalysis.script.cs">
       <DependentUpon>Conversion Analysis\PageImpressionsAutosuggestAnalysis.script</DependentUpon>
     </ScriptCode>
@@ -176,11 +195,32 @@
     <ScriptCode Include="Conversion Analysis\ConversionUniversalStoreAnalysis.script.cs">
       <DependentUpon>Conversion Analysis\ConversionUniversalStoreAnalysis.script</DependentUpon>
     </ScriptCode>
+    <ScriptCode Include="Conversion Analysis\SessionBasedAnalysis.script.cs">
+      <DependentUpon>Conversion Analysis\SessionBasedAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Conversion Analysis\SFAParseActions.script.cs">
+      <DependentUpon>Conversion Analysis\SFAParseActions.script</DependentUpon>
+    </ScriptCode>
     <ScriptCode Include="ConversionOptimusAnalysis.script.cs">
       <DependentUpon>ConversionOptimusAnalysis.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="ConversionOSAnalysis.script.cs">
       <DependentUpon>ConversionOSAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="GPTEXperimtationAnalysis\BaseStreamCreation.script.cs">
+      <DependentUpon>GPTEXperimtationAnalysis\BaseStreamCreation.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="GPTEXperimtationAnalysis\ParseAutosuggestJson.script.cs">
+      <DependentUpon>GPTEXperimtationAnalysis\ParseAutosuggestJson.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="GPTEXperimtationAnalysis\Scope1.script.cs">
+      <DependentUpon>GPTEXperimtationAnalysis\Scope1.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="GPTEXperimtationAnalysis\SearchTermAnalysis-Regular.script.cs">
+      <DependentUpon>GPTEXperimtationAnalysis\SearchTermAnalysis-Regular.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="GPTEXperimtationAnalysis\SFAIntermediate.script.cs">
+      <DependentUpon>GPTEXperimtationAnalysis\SFAIntermediate.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="PageImpressionsGetsAnalysis.script.cs">
       <DependentUpon>PageImpressionsGetsAnalysis.script</DependentUpon>
@@ -411,6 +451,7 @@
   <ItemGroup>
     <Folder Include="ACP" />
     <Folder Include="Conversion Analysis" />
+    <Folder Include="GPTEXperimtationAnalysis" />
     <Folder Include="SearchFunnel" />
     <Folder Include="QueryoptimizationExperimentation" />
     <Folder Include="QueryoptimizationExperimentation\ACP\" />

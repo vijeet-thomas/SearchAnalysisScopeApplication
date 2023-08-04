@@ -3,12 +3,12 @@
 // Used for tracking history
 
 
-#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-10), DateTime.Parse("@@endDate@@"));
-#DECLARE startDate DateTime = @endDate;
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate DateTime = @endDate.AddDays(-7);
 #DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
 #DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
-#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/SearchTermAnalysis";
-#DECLARE outputStreamPerSearch string = string.Format("{0}/OptimusSearchProduct_AutoSuggestAnalysis2.ss", @outputRoot);
+#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_22305/July_24_Autosuggest";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/OptimusSearchProduct_AutoSuggestAnalysis.ss", @outputRoot);
 #DECLARE streamExpiryString string = "60";
 #DECLARE SearchProductView string = @"/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs/SearchProduct/SearchProduct.view";
 
@@ -25,27 +25,24 @@ BaseDataDaily =
     FROM inputData
     WHERE
     SearchType == "AutoSuggest"
-    AND IsClicked > 0 AND !string.IsNullOrEmpty(ProductId)
-        AND AppVersion.Split('.')[0] == "22305";
+    AND IsClicked > 0 AND !string.IsNullOrEmpty(ProductId) AND !string.IsNullOrEmpty(PDP_ImpressionGuid)
+    AND AppVersion.Split('.')[0] == "22305";
 
 SearchesDaily =
-    SELECT //DateId,
-           Ref_CustomAttribute_3 AS SearchTerm,
+    SELECT DateId,
            COUNT(DISTINCT ImpressionGuid ) AS SearchImpressions,
            COUNT(DISTINCT CVRoot ) AS SearchSessions
     FROM BaseDataDaily;
 
 ClicksDaily = 
-    SELECT  //DateId,
-            Ref_CustomAttribute_3 AS SearchTerm,
+    SELECT  DateId,
             COUNT(DISTINCT PDP_ImpressionGuid ) AS ClickImpressions,
             COUNT(DISTINCT CVRoot ) AS ClickSessions
     FROM BaseDataDaily
     WHERE !string.IsNullOrEmpty(PDP_ImpressionGuid);
 
 InstallsDaily =
-    SELECT //DateId,
-            Ref_CustomAttribute_3 AS SearchTerm,
+    SELECT DateId,
            COUNT(DISTINCT PDP_ImpressionGuid ) AS InstallImpressions,
            COUNT(DISTINCT CVRoot ) AS InstallSessions
     FROM BaseDataDaily
@@ -58,7 +55,7 @@ SearchSummary =
            b.ClickSessions,
            c.InstallImpressions,
            c.InstallSessions
-    FROM SearchesDaily AS a INNER JOIN ClicksDaily AS b ON a.SearchTerm == b.SearchTerm INNER JOIN InstallsDaily AS c ON a.SearchTerm == c.SearchTerm;
+    FROM SearchesDaily AS a INNER JOIN ClicksDaily AS b ON a.DateId == b.DateId INNER JOIN InstallsDaily AS c ON a.DateId == c.DateId;
 
 SearchSummary =
     SELECT *,
@@ -69,5 +66,5 @@ SearchSummary =
     FROM SearchSummary;
 
 OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch
-CLUSTERED BY SearchTerm
-SORTED BY DateId DESC;
+CLUSTERED BY DateId
+SORTED BY SearchImpressions DESC;

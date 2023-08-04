@@ -50,8 +50,8 @@ SearchesDaily =
            COUNT(DISTINCT PageImpressionGuid) AS TotalSearches
     FROM BaseDataDaily;
 
-SearchClicksAndInstallsDaily = SELECT Timestamp, SearchTerm, Market, PageImpressionGuid,
-                            Math.Min(1, COUNT(DISTINCT PageImpressionGuid)) AS Clicks,
+SearchClicksAndInstallsDaily = SELECT Timestamp, SearchTerm, Market, CVRoot,
+                            Math.Min(1, COUNT(DISTINCT CVRoot)) AS Clicks,
                             Math.Min(1, SUM(StartedPurchaseFlow_Free) + SUM(StartedPurchaseFlow_Paid) + SUM(StartedPurchaseFlow_Trial) + SUM(AttemptedInstalls)) AS Installs
                           FROM BaseDataDaily
                           WHERE IsClicked == true;
