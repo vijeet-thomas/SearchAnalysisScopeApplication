@@ -2,54 +2,63 @@
 // Script GUID:2ff16528-3520-427f-a8d7-cffea115d227
 // Used for tracking history
 
-
-#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -3), DateTime.Parse("@@endDate@@"));
+#DECLARE firstDay DateTime = new DateTime(2023, 09, 06);
+#DECLARE lastDay DateTime = new DateTime(2023, 09, 12);
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -4), DateTime.Parse("@@endDate@@"));
 #DECLARE startDate DateTime = @endDate.AddDays(-7);
-#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
-#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
-//#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_22305/";
-#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/";
-#DECLARE outputStreamPerSearch string = string.Format("{0}/OptimusSearchProduct_EndToEndAnalysis.ss", @outputRoot);
+#DECLARE endDateString string = @lastDay.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @firstDay.ToString("yyyy-MM-dd");
+#DECLARE outputRoot string = @"users/vijeetthomas/";
+//#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/OptimusSearchProduct_EndToEnd_StarField.ss", @outputRoot);
 #DECLARE streamExpiryString string = "60";
 #DECLARE SearchProductView string = @"/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs/SearchProduct/SearchProduct.view";
 
-inputData =
-    VIEW @SearchProductView 
-    PARAMS 
-    (
-        StartDate = @startDateString,
-        EndDate = @endDateString
-    );
+
+#DECLARE inputDirectory string = "/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs";
+#DECLARE inputSearchProduct string = @"/Search/%Y/%m/SearchProduct_%Y_%m_%d.ss";
+
 
 BaseDataDaily =
-    SELECT *
-    FROM inputData
+    SELECT *.Except(SearchTerm),
+           SearchTerm.ToLower().Trim() AS SearchTerm
+    FROM 
+    (
+        SSTREAM STREAMSET @inputDirectory
+                PATTERN @inputSearchProduct
+                RANGE __date = [@startDateString, @endDateString]
+    )
     WHERE
-    (SearchType == "Regular"
-    OR (SearchType == "AutoSuggest"
-    AND IsClicked > 0 AND !string.IsNullOrEmpty(ProductId) AND !string.IsNullOrEmpty(PDP_ImpressionGuid)) );
-         // AND AppVersion.Split('.')[0] == "22305";
-
+    (  SearchType == "Regular"
+        OR (SearchType == "AutoSuggest" AND IsClicked == 1 AND !string.IsNullOrEmpty(PDP_ImpressionGuid))
+    )
+    //AND AppVersion.Split('.')[0] IN ("22306","22307","22308","22309")
+    AND SearchSource == "search"
+    //AND Country IN ("AU","UK");
+    AND ProductId == "9NCJSXWZTP88";
+    
 SearchesDaily =
     SELECT DateId,
+           SearchTerm,
            COUNT(DISTINCT ImpressionGuid ) AS SearchImpressions,
            COUNT(DISTINCT CVRoot ) AS SearchSessions
     FROM BaseDataDaily;
 
 ClicksDaily = 
     SELECT  DateId,
+            SearchTerm,
             COUNT(DISTINCT PDP_ImpressionGuid ) AS ClickImpressions,
             COUNT(DISTINCT CVRoot ) AS ClickSessions
     FROM BaseDataDaily
-    WHERE !string.IsNullOrEmpty(PDP_ImpressionGuid);
+    WHERE IsClicked == 1;
 
 InstallsDaily =
     SELECT DateId,
+           SearchTerm,
            COUNT(DISTINCT PDP_ImpressionGuid ) AS InstallImpressions,
            COUNT(DISTINCT CVRoot ) AS InstallSessions
     FROM BaseDataDaily
-    WHERE !string.IsNullOrEmpty(PDP_ImpressionGuid)
-        AND IsAttemptedAcquisition > 0;
+    WHERE IsAttemptedAcquisition > 0;
 
 SearchSummary = 
     SELECT a.*,
@@ -57,7 +66,11 @@ SearchSummary =
            b.ClickSessions,
            c.InstallImpressions,
            c.InstallSessions
-    FROM SearchesDaily AS a INNER JOIN ClicksDaily AS b ON a.DateId == b.DateId INNER JOIN InstallsDaily AS c ON a.DateId == c.DateId;
+    FROM SearchesDaily AS a 
+         INNER JOIN ClicksDaily AS b 
+         ON a.DateId == b.DateId AND a.SearchTerm == b.SearchTerm
+         INNER JOIN InstallsDaily AS c
+         ON a.DateId == c.DateId AND a.SearchTerm == c.SearchTerm;
 
 SearchSummary =
     SELECT *,

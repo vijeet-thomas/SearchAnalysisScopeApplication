@@ -9,18 +9,19 @@
 //USING Newtonsoft.Json.Converters;
 //USING Newtonsoft.Json.Linq;
 
-#DECLARE firstDay DateTime = new DateTime(2023, 7, 14);
-#DECLARE lastDay DateTime = new DateTime(2023, 7, 21);
+#DECLARE firstDay DateTime = new DateTime(2023, 7, 27);
+#DECLARE lastDay DateTime = new DateTime(2023, 8, 16);
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -4), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate DateTime = @endDate.AddDays(-7);
 #DECLARE firstDayString string = @firstDay.ToString("yyyy-MM-dd");
 #DECLARE lastDayString string = @lastDay.ToString("yyyy-MM-dd");
 
-//#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_22305/";
-#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/";
+#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_Greater_22306/Market_AU_UK";
+//#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/";
 #DECLARE outputStreamPerSearch string = string.Format("{0}/SFA_PageImpressions_EndToEnd.ss", @outputRoot);
 #DECLARE outputInterStreamPerSearch string = string.Format("{0}/SFA_PageImpressions_EndToEnd_IntermediateStream.ss", @outputRoot);
 #DECLARE streamExpiryString string = "60";
 #DECLARE SFAView string = @"/shares/DAP.Prod/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
-//SET @@FeaturePreviews = "EnableJsonIntrinsics:on";
 
 inputData =
     VIEW @SFAView 
@@ -34,8 +35,9 @@ inputData =
 
 AllSearches =
     SELECT *
-    FROM inputData;
-   // WHERE MajorBuildNumber == 22305;
+    FROM inputData
+    WHERE MajorBuildNumber >= 22306
+    AND CountryCode IN ("AU", "UK");
 
 
 Searches = SELECT DateId,
@@ -46,14 +48,13 @@ Searches = SELECT DateId,
 
 Clicks = SELECT DateId,
            COUNT (DISTINCT ImpressionGuid) AS ClicksImpressions,
-           COUNT (DISTINCT CVRoot) AS UniqueClicksSessions
+           COUNT (DISTINCT CVRoot) AS ClicksSessions
     FROM AllSearches
     WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList") OR ( PageName == "pdp" AND Ref_AreaName == "AutoSuggest");
 
 Installs = SELECT DateId,
            COUNT (DISTINCT ImpressionGuid) AS InstallsImpressions,
-           COUNT (DISTINCT CVRoot) AS UniqueInstallSessions,
-           (SUM (AttemptedAcquisitionCount) + SUM (InstallClicks)) AS AllInstallSessions
+           COUNT (DISTINCT CVRoot) AS InstallSessions
     FROM AllSearches
     WHERE (  (
                  (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList")  //Regular
@@ -70,10 +71,8 @@ SearchSummary =
            c.*.Except(DateId),
            (ClicksImpressions*100.0/SearchImpressions) AS CTRImpressions,
            (InstallsImpressions*100.0/SearchImpressions) AS ConversionImpressions,
-           (UniqueClicksSessions*100.0/SearchSessions) AS CTRSessions,
-           (UniqueInstallSessions*100.0/SearchSessions) AS ConversionSessions,
-           (ClicksImpressions*100.0/SearchSessions) AS AllClicksCTRSessions,
-           (AllInstallSessions*100.0/SearchSessions) AS AllInstallsConversionSessions
+           (ClicksSessions*100.0/SearchSessions) AS CTRSessions,
+           (InstallSessions*100.0/SearchSessions) AS ConversionSessions
     FROM Searches AS a 
          INNER JOIN Clicks AS b 
             ON a.DateId == b.DateId

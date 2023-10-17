@@ -9,12 +9,12 @@
 #DECLARE outputRoot string = @"users/vijeetthomas/GPT-AIEnrichedTermsAnalysis/";
 #DECLARE inputStreamPerSearch string = string.Format("{0}/SFA_Intermediate_Stream.ss", @outputRoot);
 
-#DECLARE outputStreamPerSearch string = string.Format("{0}/RegularSearchTermAnalysis2.ss", @outputRoot);
-#DECLARE temp string = string.Format("{0}/SummaryTreatment.ss", @outputRoot);
+#DECLARE outputStreamPerSearch string = string.Format("{0}/RegularSearchTermAnalysis.ss", @outputRoot);
+//#DECLARE temp string = string.Format("{0}/SummaryTreatment.ss", @outputRoot);
 
 #DECLARE streamExpiryString string = "60";
 #DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
-
+//#DECLARE searchterms string = @"html, angry, abc, kids, internet, calendar, screen+recorder, video+recorder, solitaire";
 //FilteredIds = 
 //    EXTRACT ProductId : string
 //    FROM @inputFile
@@ -48,31 +48,42 @@ WHERE PageName  == "searchPage"
       AND Uri IS NOT NULL AND Uri.Contains("pages/search?")
       AND Uri.Contains("query=");
 
-ClicksT = SELECT  ReferrerUri.Split(new string[] { "query=" }, StringSplitOptions.None)[1].Split('&')[0].ToLower().Trim() AS SearchTermT,
-           COUNT (DISTINCT ImpressionGuid) AS ClicksImpressionsT
+ClicksT =
+    SELECT ReferrerUri.Split(new string[]{ "query=" }, StringSplitOptions.None) [1].Split('&') [0].ToLower().Trim() AS SearchTermT,
+//           ProductId AS ProductIdT,
+           //ProductDisplayName AS ProductDisplayNameT,
+           COUNT(DISTINCT ImpressionGuid) AS ClicksImpressionsT
     FROM BaseDataTreatment
     WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList")
           AND ReferrerUri IS NOT NULL
-          AND ReferrerUri.Contains("query="); 
+          AND ReferrerUri.Contains("query=");
+//          AND ProductId IN ("9P6RC76MSMMJ","9NDJQ0J8KSDZ","9PB13JL37ZV4","9PBCL95XJ55D","9NBLGGH6BNG3","9P8CP1L72JXS","9PNB8DFT7FZ2","9NMSF5GMFCHC","9PF9RTKMMQ69","9PKB9Q1GG832","9NBLGGH4R2R6","9P3CP9G025RM","9N9CCD41TFT3","9NZVDKPMR9RD","9NBLGGH4Z1JC","9NRQBLR605RG","9WZDNCRFHVN5","9WZDNCRD29V9","9PKL3H9LWMB7");
+
+//ClicksT = SELECT * FROM ClicksT WHERE SearchTermT IN ("html", "angry", "abc", "kids", "internet", "calendar", "screen+recorder", "video+recorder", "solitaire");
 
 InstallsT =
-    SELECT ReferrerUri.Split(new string[] { "query=" }, StringSplitOptions.None)[1].Split('&')[0].ToLower().Trim() AS SearchTermT,
+    SELECT ReferrerUri.Split(new string[]{ "query=" }, StringSplitOptions.None) [1].Split('&') [0].ToLower().Trim() AS SearchTermT,
+//           ProductId AS ProductIdT,
+           //ProductDisplayName AS ProductDisplayNameT,
            COUNT(DISTINCT ImpressionGuid) AS InstallsImpressionsT
     FROM BaseDataTreatment
     WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList")
           AND ReferrerUri IS NOT NULL
           AND ReferrerUri.Contains("query=")
           AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0);
+//AND ProductId IN ("9P6RC76MSMMJ","9NDJQ0J8KSDZ","9PB13JL37ZV4","9PBCL95XJ55D","9NBLGGH6BNG3","9P8CP1L72JXS","9PNB8DFT7FZ2","9NMSF5GMFCHC","9PF9RTKMMQ69","9PKB9Q1GG832","9NBLGGH4R2R6","9P3CP9G025RM","9N9CCD41TFT3","9NZVDKPMR9RD","9NBLGGH4Z1JC","9NRQBLR605RG","9WZDNCRFHVN5","9WZDNCRD29V9","9PKL3H9LWMB7");
+
+//InstallsT = SELECT * FROM InstallsT WHERE SearchTermT IN ("html", "angry", "abc", "kids", "internet", "calendar", "screen+recorder", "video+recorder", "solitaire");
 
 SearchSummaryTreatment = 
     SELECT a.*,
            b.*.Except(SearchTermT),
-           c.*.Except(SearchTermT)
+           c.*.Except(SearchTermT)//,ProductIdT)
     FROM SearchesT AS a INNER JOIN 
          ClicksT AS b 
             ON a.SearchTermT == b.SearchTermT
          INNER JOIN InstallsT AS c
-            ON a.SearchTermT == c.SearchTermT;
+            ON a.SearchTermT == c.SearchTermT;// AND b.ProductIdT == c.ProductIdT;
 
 //----------------------------
 
@@ -91,36 +102,50 @@ WHERE PageName  == "searchPage"
       AND Uri.Contains("query=");
 
 ClicksC = SELECT ReferrerUri.Split(new string[] { "query=" }, StringSplitOptions.None)[1].Split('&')[0].ToLower().Trim() AS SearchTermC, 
+                 //ProductId AS ProductIdC,
+                 //ProductDisplayName AS ProductDisplayNameC,
            COUNT (DISTINCT ImpressionGuid) AS ClicksImpressionsC
     FROM BaseDataControl
     WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList")
           AND ReferrerUri IS NOT NULL
-          AND ReferrerUri.Contains("query="); 
+          AND ReferrerUri.Contains("query=");
+//AND ProductId IN ("9P6RC76MSMMJ","9NDJQ0J8KSDZ","9PB13JL37ZV4","9PBCL95XJ55D","9NBLGGH6BNG3","9P8CP1L72JXS","9PNB8DFT7FZ2","9NMSF5GMFCHC","9PF9RTKMMQ69","9PKB9Q1GG832","9NBLGGH4R2R6","9P3CP9G025RM","9N9CCD41TFT3","9NZVDKPMR9RD","9NBLGGH4Z1JC","9NRQBLR605RG","9WZDNCRFHVN5","9WZDNCRD29V9","9PKL3H9LWMB7");
+
+//ClicksC = SELECT * FROM ClicksC WHERE SearchTermC IN ("html", "angry", "abc", "kids", "internet", "calendar", "screen+recorder", "video+recorder", "solitaire");
 
 InstallsC =
     SELECT ReferrerUri.Split(new string[] { "query=" }, StringSplitOptions.None)[1].Split('&')[0].ToLower().Trim() AS SearchTermC,
+  //         ProductId AS ProductIdC,
+           //ProductDisplayName AS ProductDisplayNameC,
            COUNT(DISTINCT ImpressionGuid) AS InstallsImpressionsC
     FROM BaseDataControl
      WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList")
           AND ReferrerUri IS NOT NULL
           AND ReferrerUri.Contains("query=")
           AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0);
+//AND ProductId IN ("9P6RC76MSMMJ","9NDJQ0J8KSDZ","9PB13JL37ZV4","9PBCL95XJ55D","9NBLGGH6BNG3","9P8CP1L72JXS","9PNB8DFT7FZ2","9NMSF5GMFCHC","9PF9RTKMMQ69","9PKB9Q1GG832","9NBLGGH4R2R6","9P3CP9G025RM","9N9CCD41TFT3","9NZVDKPMR9RD","9NBLGGH4Z1JC","9NRQBLR605RG","9WZDNCRFHVN5","9WZDNCRD29V9","9PKL3H9LWMB7");
 
-SearchSummaryControl = 
+//InstallsC = SELECT * FROM InstallsC WHERE SearchTermC IN ("html", "angry", "abc", "kids", "internet", "calendar", "screen+recorder", "video+recorder", "solitaire");
+
+SearchSummaryControl =
     SELECT a.*,
            b.*.Except(SearchTermC),
-           c.*.Except(SearchTermC)
-    FROM SearchesC AS a INNER JOIN
-         ClicksC AS b 
-            ON a.SearchTermC == b.SearchTermC
-         INNER JOIN InstallsC AS c
-            ON a.SearchTermC == c.SearchTermC;
+           c.*.Except(SearchTermC) //,ProductIdC)
+    FROM SearchesC AS a
+    INNER JOIN
+        ClicksC AS b
+        ON a.SearchTermC == b.SearchTermC
+    INNER JOIN
+        InstallsC AS c
+        ON a.SearchTermC == c.SearchTermC;// AND b.ProductIdC == c.ProductIdC;
 
-FinalOverviewOutput = 
-    SELECT b.*, a.*
-    FROM SearchSummaryTreatment AS a 
-         LEFT OUTER JOIN SearchSummaryControl AS b 
-         ON a.SearchTermT == b.SearchTermC;
+FinalOverviewOutput =
+    SELECT b.*,
+           a.*
+    FROM SearchSummaryTreatment AS a
+    FULL OUTER JOIN
+        SearchSummaryControl AS b
+        ON a.SearchTermT == b.SearchTermC; //AND a.ProductIdT == b.ProductIdC;
 
 OUTPUT FinalOverviewOutput
 TO SSTREAM @outputStreamPerSearch;

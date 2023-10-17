@@ -37,9 +37,14 @@
     <Script Include="ACP\ACPAnalysis6.script" />
     <Script Include="ACP\ACPAnalysis7.script" />
     <Script Include="ACP\ACPTop1500SearchTerms.script" />
+    <Script Include="Ads\AdsTop10KCoverage.script" />
+    <Script Include="Ads\OptimusAdsFunnel.script" />
+    <Script Include="AISearchTermsExperimentAnalysis\ProductLevelnalysis.script" />
+    <Script Include="AISearchTermsExperimentAnalysis\WhatsappSearchtermAnalysis.script" />
     <Script Include="AndroidRnRExtract.script" />
     <Script Include="AppVerUserDistribution.script" />
     <Script Include="ComparisonStream.script" />
+    <Script Include="Conversion Analysis\PageImpressionDeviceAnalysisEndToEnd.script" />
     <Script Include="Conversion Analysis\OptimusEndToEnd.script" />
     <Script Include="Conversion Analysis\PageImpressionProduct.script" />
     <Script Include="Conversion Analysis\PageImpressionEndToEnd.script" />
@@ -60,6 +65,9 @@
     <Script Include="PageImpressionsGetsAnalysis.script" />
     <Script Include="ConversionSFAAnalysis.script" />
     <Script Include="InApps_Revenue_v2.script" />
+    <Script Include="RelatedProductsExperimentation\ExperimentationSPRegularAnalysis.script" />
+    <Script Include="RelatedProductsExperimentation\ExperimentationSPAutosuggestAnalysis.script" />
+    <Script Include="RelatedProductsExperimentation\ExperimentationSPEndToEnd.script" />
     <Script Include="Revenue.script" />
     <Script Include="Scope2.script" />
     <Script Include="SearchDistribution6Months.script" />
@@ -162,6 +170,18 @@
     <ScriptCode Include="ACP\ACPTop1500SearchTerms.script.cs">
       <DependentUpon>ACP\ACPTop1500SearchTerms.script</DependentUpon>
     </ScriptCode>
+    <ScriptCode Include="Ads\AdsTop10KCoverage.script.cs">
+      <DependentUpon>Ads\AdsTop10KCoverage.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Ads\OptimusAdsFunnel.script.cs">
+      <DependentUpon>Ads\OptimusAdsFunnel.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="AISearchTermsExperimentAnalysis\ProductLevelnalysis.script.cs">
+      <DependentUpon>AISearchTermsExperimentAnalysis\ProductLevelnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="AISearchTermsExperimentAnalysis\WhatsappSearchtermAnalysis.script.cs">
+      <DependentUpon>AISearchTermsExperimentAnalysis\WhatsappSearchtermAnalysis.script</DependentUpon>
+    </ScriptCode>
     <ScriptCode Include="AndroidRnRExtract.script.cs">
       <DependentUpon>AndroidRnRExtract.script</DependentUpon>
     </ScriptCode>
@@ -170,6 +190,9 @@
     </ScriptCode>
     <ScriptCode Include="ComparisonStream.script.cs">
       <DependentUpon>ComparisonStream.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="Conversion Analysis\PageImpressionDeviceAnalysisEndToEnd.script.cs">
+      <DependentUpon>Conversion Analysis\PageImpressionDeviceAnalysisEndToEnd.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="Conversion Analysis\OptimusEndToEnd.script.cs">
       <DependentUpon>Conversion Analysis\OptimusEndToEnd.script</DependentUpon>
@@ -230,6 +253,15 @@
     </ScriptCode>
     <ScriptCode Include="InApps_Revenue_v2.script.cs">
       <DependentUpon>InApps_Revenue_v2.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="RelatedProductsExperimentation\ExperimentationSPRegularAnalysis.script.cs">
+      <DependentUpon>RelatedProductsExperimentation\ExperimentationSPRegularAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="RelatedProductsExperimentation\ExperimentationSPAutosuggestAnalysis.script.cs">
+      <DependentUpon>RelatedProductsExperimentation\ExperimentationSPAutosuggestAnalysis.script</DependentUpon>
+    </ScriptCode>
+    <ScriptCode Include="RelatedProductsExperimentation\ExperimentationSPEndToEnd.script.cs">
+      <DependentUpon>RelatedProductsExperimentation\ExperimentationSPEndToEnd.script</DependentUpon>
     </ScriptCode>
     <ScriptCode Include="Revenue.script.cs">
       <DependentUpon>Revenue.script</DependentUpon>
@@ -452,6 +484,9 @@
     <Folder Include="ACP" />
     <Folder Include="Conversion Analysis" />
     <Folder Include="GPTEXperimtationAnalysis" />
+    <Folder Include="Ads" />
+    <Folder Include="AISearchTermsExperimentAnalysis" />
+    <Folder Include="RelatedProductsExperimentation" />
     <Folder Include="SearchFunnel" />
     <Folder Include="QueryoptimizationExperimentation" />
     <Folder Include="QueryoptimizationExperimentation\ACP\" />

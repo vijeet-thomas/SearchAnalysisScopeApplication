@@ -1,0 +1,82 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:79324274-eafd-4c12-94c0-aac597416367
+// Used for tracking history
+
+// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:b2d16ff3-9a37-4b04-ab93-ebf9ce111e18
+// Used for tracking history
+
+//Date Parameters
+#IF("@@endDate@@".StartsWith("@@"))
+    #DECLARE endDate DateTime = DateTime.UtcNow.AddDays(-3);
+#ELSE 
+    #DECLARE endDate DateTime = DateTime.Parse("@@endDate@@");
+#ENDIF
+
+#DECLARE streamEndDate DateTime   = @endDate;
+#DECLARE streamStartDate DateTime = @endDate.AddDays(-21); //new DateTime(@streamEndDate.Year, @streamEndDate.Month, 1);
+
+#DECLARE streamEndDateString string   = @streamEndDate.ToString("yyyy-MM-dd");
+#DECLARE streamStartDateString string = @streamStartDate.ToString("yyyy-MM-dd");
+
+//INPUT
+#DECLARE inputDirectory string = "/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs";
+#DECLARE inputSearchProduct string = @"/Search/%Y/%m/SearchProduct_%Y_%m_%d.ss";
+
+//OUTPUT
+#DECLARE rootFolder string = @"/users/vijeetthomas/DeviceBasedAnalysis";
+
+#DECLARE outputDSQSessionsOverall string  = string.Format("{0}/{1:yyyy}/{1:MM}/DeviceAnalysis_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+
+#DECLARE streamExpiry string = "365";
+
+//Data Collection
+AllData = 
+    SELECT *.Except(SearchTerm),
+           SearchTerm.ToLower().Trim() AS SearchTerm
+    FROM 
+    (
+        SSTREAM STREAMSET @inputDirectory
+                PATTERN @inputSearchProduct
+                RANGE __date = [@streamStartDateString, @streamEndDateString]
+    )
+    WHERE ( SearchType == "AutoComplete" OR SearchType == "Regular" 
+            OR (SearchType == "AutoSuggest" AND IsClicked == 1 AND !string.IsNullOrEmpty(PDP_ImpressionGuid)) 
+          )
+          AND SearchTerm IS NOT NULL;
+
+//Getting search metrics overall
+SearchesDaily =
+    SELECT DateId,
+           COUNT(DISTINCT DeviceId) AS SearchCount
+    FROM AllData;
+
+ClicksDaily =
+    SELECT DateId,
+           COUNT(DISTINCT DeviceId) AS ClickCount
+    FROM AllData
+    WHERE IsClicked == 1;
+
+InstallsDaily =
+    SELECT DateId,
+           COUNT(DISTINCT DeviceId) AS InstallCount
+    FROM AllData
+    WHERE IsAttemptedAcquisition > 0;
+
+//Getting the overall search metrics per day
+SummaryOverall =
+    SELECT a.DateId,
+           a.SearchCount,
+           b.ClickCount,
+           c.InstallCount
+    FROM SearchesDaily AS a
+    INNER JOIN
+        ClicksDaily AS b
+        ON a.DateId == b.DateId
+    INNER JOIN
+        InstallsDaily AS c
+        ON a.DateId == c.DateId;
+
+OUTPUT SummaryOverall
+ TO SSTREAM @outputDSQSessionsOverall
+    WITH STREAMEXPIRY @streamExpiry;

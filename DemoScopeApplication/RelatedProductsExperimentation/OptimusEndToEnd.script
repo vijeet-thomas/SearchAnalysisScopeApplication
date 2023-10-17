@@ -1,21 +1,22 @@
 ﻿// Copyright (C) Microsoft Corporation. All rights reserved.
-// Script GUID:745e5ef9-3916-4d56-9c79-1796a47e7675
+// Script GUID:2ff16528-3520-427f-a8d7-cffea115d227
 // Used for tracking history
 
-#DECLARE firstDay DateTime = new DateTime(2023, 7, 27);
-#DECLARE lastDay DateTime = new DateTime(2023, 8, 16);
-
-#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+#DECLARE firstDay DateTime = new DateTime(2023, 8, 09);
+#DECLARE lastDay DateTime = new DateTime(2023, 8, 20);
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -4), DateTime.Parse("@@endDate@@"));
 #DECLARE startDate DateTime = @endDate.AddDays(-7);
 #DECLARE endDateString string = @lastDay.ToString("yyyy-MM-dd");
 #DECLARE startDateString string = @firstDay.ToString("yyyy-MM-dd");
-#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_Greater_22306/Market_AU_UK";
-#DECLARE outputStreamPerSearch string = string.Format("{0}/OptimusSearchProduct_AutoSuggestAnalysis.ss", @outputRoot);
+#DECLARE outputRoot string = @"users/vijeetthomas/RelatedProductsExperimentation/AppVer_Greater_22306/Market_AU_UK/All/";
+//#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/OptimusSearchProduct_EndToEndAnalysis.ss", @outputRoot);
 #DECLARE streamExpiryString string = "60";
 #DECLARE SearchProductView string = @"/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs/SearchProduct/SearchProduct.view";
 
 #DECLARE inputDirectory string = "/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs";
 #DECLARE inputSearchProduct string = @"/Search/%Y/%m/SearchProduct_With_Flights_%Y_%m_%d.ss";
+
 
 BaseDataDaily =
     SELECT *.Except(SearchTerm),
@@ -27,49 +28,53 @@ BaseDataDaily =
                 RANGE __date = [@startDateString, @endDateString]
     )
     WHERE
-    SearchType == "AutoSuggest"
-    AND IsClicked > 0 AND !string.IsNullOrEmpty(PDP_ImpressionGuid)
+    (  SearchType == "Regular"
+        OR (SearchType == "AutoSuggest" AND IsClicked == 1 AND !string.IsNullOrEmpty(PDP_ImpressionGuid))
+    )
+    AND AppVersion.Split('.')[0] IN ("22306","22307","22308","22309")
     AND SearchSource == "search"
-    AND Country IN ("AU","UK")
-    AND AppVersion.Split('.')[0] IN ("22306","22307","22308","22309");
+    //AND DeviceClass == "Windows.Desktop"
+    AND Country IN ("AU","GB")
+    //AND FlightName.Contains("VAS_EXP_AiRelatedProductMetadataEnrichment:false")
+    //AND AssignmentContext LIKE "%8c282580%"
+;
 
 SearchesDaily =
-    SELECT DateId,
+    SELECT //DateId,
            COUNT(DISTINCT ImpressionGuid ) AS SearchImpressions,
            COUNT(DISTINCT CVRoot ) AS SearchSessions
     FROM BaseDataDaily;
 
 ClicksDaily = 
-    SELECT  DateId,
+    SELECT  //DateId,
             COUNT(DISTINCT ImpressionGuid ) AS ClickImpressions,
             COUNT(DISTINCT CVRoot ) AS ClickSessions
     FROM BaseDataDaily
     WHERE IsClicked == 1;
 
 InstallsDaily =
-    SELECT DateId,
+    SELECT //DateId,
            COUNT(DISTINCT ImpressionGuid ) AS InstallImpressions,
            COUNT(DISTINCT CVRoot ) AS InstallSessions
     FROM BaseDataDaily
-    WHERE !string.IsNullOrEmpty(PDP_ImpressionGuid)
-        AND IsAttemptedAcquisition > 0;
+    WHERE IsAttemptedAcquisition > 0;
 
 SearchSummary = 
     SELECT a.*,
            b.ClickImpressions,
            b.ClickSessions,
            c.InstallImpressions,
-           c.InstallSessions
-    FROM SearchesDaily AS a INNER JOIN ClicksDaily AS b ON a.DateId == b.DateId INNER JOIN InstallsDaily AS c ON a.DateId == c.DateId;
-
-SearchSummary =
-    SELECT *,
+           c.InstallSessions,
            (ClickImpressions * 100.0 / SearchImpressions) AS CTRImpressions,
            (InstallImpressions * 100.0 / SearchImpressions) AS ConversionImpressions,
            (ClickSessions * 100.0 / SearchSessions) AS CTRSessions,
            (InstallSessions * 100.0 / SearchSessions) AS ConversionSessions
-    FROM SearchSummary;
+    FROM SearchesDaily AS a 
+         CROSS JOIN ClicksDaily AS b 
+                    //ON a.DateId == b.DateId 
+         CROSS JOIN InstallsDaily AS c 
+                //ON a.DateId == c.DateId
+                    ;
 
 OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch
-CLUSTERED BY DateId
-SORTED BY SearchImpressions DESC;
+;

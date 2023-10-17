@@ -1,0 +1,83 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:745e5ef9-3916-4d56-9c79-1796a47e7675
+// Used for tracking history
+
+#DECLARE firstDay DateTime = new DateTime(2023, 8, 07);
+#DECLARE lastDay DateTime = new DateTime(2023, 8, 08);
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate DateTime = @endDate.AddDays(-7);
+#DECLARE endDateString string = @lastDay.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @firstDay.ToString("yyyy-MM-dd");
+#DECLARE outputRoot string = @"users/vijeetthomas/RelatedProductsExperimentation/AppVer_Greater_22306/Market_AU_UK/All/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/ExperimentationSP_EndToEndAnalysis.ss", @outputRoot);
+#DECLARE streamExpiryString string = "60";
+
+#DECLARE inputDirectory string = "/shares/asimov.prod.data/PublicPartner/Processed/ACE/Experimentation";
+#DECLARE inputSearchProduct string = @"/%Y/%m/ExperimentationSearchProduct_%Y_%m_%d.ss";
+
+BaseDataDaily =
+    SELECT *.Except(SearchTerm),
+           SearchTerm.ToLower().Trim() AS SearchTerm
+    FROM 
+    (
+        SSTREAM STREAMSET @inputDirectory
+                PATTERN @inputSearchProduct
+                RANGE __date = [@startDateString, @endDateString]
+    )
+    WHERE
+    ((SearchType == "Autosuggest" AND IsClicked > 0) OR SearchType == "Regular")
+    AND IsFinalSearch == true
+    //AND IsTest != 1
+    AND DeviceClass == "Windows.Desktop"
+    AND !string.IsNullOrEmpty(SearchTerm)
+    AND AppVer IN ("22306","22307","22308")
+    AND Country IN ("AU", "GB")
+   // AND FlightName.Contains("VAS_EXP_AiRelatedProductMetadataEnrichment:false")
+;
+
+SearchesDaily =
+    SELECT COUNT(DISTINCT PageImpressionGuid ) AS SearchImpressions,
+           COUNT(DISTINCT CVRoot ) AS SearchSessions
+    FROM BaseDataDaily;
+
+ClicksDaily = 
+    SELECT  COUNT(DISTINCT PageImpressionGuid ) AS ClickImpressions,
+            COUNT(DISTINCT CVRoot ) AS ClickSessions
+    FROM BaseDataDaily
+    WHERE IsClicked > 0;
+
+InstallsDaily =
+    SELECT COUNT(DISTINCT PageImpressionGuid) AS InstallImpressions,
+           COUNT(DISTINCT CVRoot) AS InstallSessions
+    FROM BaseDataDaily
+    WHERE AttemptedAcquisitionOrInstall > 0
+                                          //    OR StartedPurchaseFlow_Free > 0
+                                          //    OR StartedPurchaseFlow_Paid > 0
+                                          //    OR StartedPurchaseFlow_Trial > 0;
+                                          ;
+
+SearchSummary =
+    SELECT a.*,
+           b.ClickImpressions,
+           b.ClickSessions,
+           c.InstallImpressions,
+           c.InstallSessions
+    FROM SearchesDaily AS a
+    CROSS JOIN
+        ClicksDaily AS b
+    //ON a.DateId == b.DateId 
+    CROSS JOIN
+        InstallsDaily AS c
+                         //ON a.DateId == c.DateId;
+                         ;
+SearchSummary =
+    SELECT *,
+           (ClickImpressions * 100.0 / SearchImpressions) AS CTRImpressions,
+           (InstallImpressions * 100.0 / SearchImpressions) AS ConversionImpressions,
+           (ClickSessions * 100.0 / SearchSessions) AS CTRSessions,
+           (InstallSessions * 100.0 / SearchSessions) AS ConversionSessions
+    FROM SearchSummary;
+
+OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch
+;

@@ -1,0 +1,139 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:beed83f8-5c4a-4f40-ac23-b2775e18a9ed
+// Used for tracking history
+
+
+//Time Range Input
+#DECLARE startDate DateTime = DateTime.Parse(@"2023-09-09T00:00:00");
+#DECLARE endDate DateTime = DateTime.Parse(@"2023-09-19T00:00:00");
+
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+
+//Input Stream
+#DECLARE inputSearchProductView string = @"/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs/Search/SearchProductWithExperimentsData.view";
+#DECLARE inputFile string = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/Test/ProductId-NameMapping.csv";
+
+//Output Stream
+#DECLARE outputRoot string = @"users/vijeetthomas/EnrichedTermsExp";
+#DECLARE outputStream string = string.Format("{0}/WhatsappBetaSearchtermLevelAnalysis.ss", @outputRoot);
+
+//Data Collection
+AllData = 
+    VIEW @inputSearchProductView 
+    PARAMS 
+    (
+        StartDate = @startDateString,
+        EndDate = @endDateString
+    );
+
+//Filtering based on flights we require
+AllData = 
+    SELECT *.Except(SearchTerm),
+           SearchTerm.ToLower().Trim() AS SearchTerm,
+           CASE WHEN AssignmentContext.Contains("99790591")  THEN "TREATMENT" WHEN AssignmentContext.Contains("agh4d775") THEN "CONTROL" ELSE "NOTA" END AS ControlTreatment    
+    FROM AllData
+    WHERE (SearchType == "Regular" OR SearchType == "AutoSuggest") AND SearchSource == "search"
+        AND !string.IsNullOrEmpty(AssignmentContext)
+        AND !string.IsNullOrEmpty(SearchTerm)
+        AND ProductId == "9NBDXK71NK08";
+
+ControlData =
+    SELECT *.Except(SearchTerm),
+           SearchTerm AS SearchTermControl
+    FROM AllData
+    WHERE ControlTreatment == "CONTROL";
+
+SearchesControl =
+    SELECT //ProductId, 
+           SearchTermControl,
+           COUNT(DISTINCT Muid) AS SearchUsersControl
+    FROM ControlData;
+
+ClicksControl =
+    SELECT //ProductId, 
+           SearchTermControl,
+           COUNT(DISTINCT Muid) AS ClickUsersControl
+    FROM ControlData
+    WHERE IsClicked == 1;
+
+InstallsControl =
+    SELECT //ProductId, 
+           SearchTermControl,
+           COUNT(DISTINCT Muid) AS InstallUsersControl
+    FROM ControlData
+    WHERE IsAttemptedAcquisition > 0;
+
+SearchSummaryControl =
+    SELECT a.*,
+           b.ClickUsersControl,
+           c.InstallUsersControl,
+           (ClickUsersControl * 100.0 / SearchUsersControl) AS CTRUsersControl,
+           (InstallUsersControl * 100.0 / SearchUsersControl) AS ConversionUsersControl
+    FROM SearchesControl AS a
+    LEFT JOIN
+        ClicksControl AS b
+        ON //a.ProductId == b.ProductId AND 
+           a.SearchTermControl == b.SearchTermControl
+    LEFT JOIN
+        InstallsControl AS c
+        ON //a.ProductId == c.ProductId AND 
+           a.SearchTermControl == c.SearchTermControl;
+
+TreatmentData =
+    SELECT *.Except(SearchTerm),
+           SearchTerm AS SearchTermTreatment
+    FROM AllData
+    WHERE ControlTreatment == "TREATMENT";
+
+SearchesTreatment =
+    SELECT //ProductId, 
+           SearchTermTreatment,
+           COUNT(DISTINCT Muid) AS SearchUsersTreatment
+    FROM TreatmentData;
+
+ClicksTreatment =
+    SELECT //ProductId, 
+           SearchTermTreatment,
+           COUNT(DISTINCT Muid) AS ClickUsersTreatment
+    FROM TreatmentData
+    WHERE IsClicked == 1;
+
+InstallsTreatment =
+    SELECT //ProductId, 
+           SearchTermTreatment,
+           COUNT(DISTINCT Muid) AS InstallUsersTreatment
+    FROM TreatmentData
+    WHERE IsAttemptedAcquisition > 0;
+
+SearchSummaryTreatment =
+    SELECT a.*,
+           b.ClickUsersTreatment,
+           c.InstallUsersTreatment,
+           (ClickUsersTreatment * 100.0 / SearchUsersTreatment) AS CTRUsersTreatment,
+           (InstallUsersTreatment * 100.0 / SearchUsersTreatment) AS ConversionUsersTreatment
+    FROM SearchesTreatment AS a
+    LEFT JOIN
+        ClicksTreatment AS b
+        ON //a.ProductId == b.ProductId AND 
+           a.SearchTermTreatment == b.SearchTermTreatment
+    LEFT JOIN
+        InstallsTreatment AS c
+        ON //a.ProductId == c.ProductId AND 
+           a.SearchTermTreatment == c.SearchTermTreatment;
+
+FinalOutput = 
+    SELECT a.*,
+           b.*,//.Except(ProductId),
+           (SearchUsersTreatment - SearchUsersControl) AS SearchesDifference,
+           (ClickUsersTreatment - ClickUsersControl) AS ClicksDifference,
+           (InstallUsersTreatment - InstallUsersControl) AS InstallsDifference
+    FROM SearchSummaryControl AS a 
+         FULL OUTER JOIN SearchSummaryTreatment AS b 
+         ON //a.ProductId == b.ProductId AND 
+            a.SearchTermControl == b.SearchTermTreatment;
+
+OUTPUT FinalOutput
+TO SSTREAM @outputStream
+CLUSTERED BY SearchTermControl, SearchesDifference
+SORTED BY SearchesDifference;

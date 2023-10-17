@@ -7,15 +7,17 @@
 #DECLARE startDate1Day DateTime = @endDate.AddDays(-7);
 #DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
 #DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
-#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_22305/July_24_Regular";
+#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_Greater_22306/Market_AU_UK";
 #DECLARE outputStreamPerSearch string = string.Format("{0}/SFA_PageImpressions_RegularAnalysis.ss", @outputRoot);
 #DECLARE streamExpiryString string = "60";
-#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+#DECLARE SFAView string = @"/shares/DAP.Prod/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
 
 inputData =
     VIEW @SFAView 
     PARAMS 
     (
+        inputRootPath = "/shares/DAP.Prod",
+        uiNavigationPath =  "/UINavigation",
         startDate = @startDate1DayString,
         endDate = @endDateString
     );
@@ -23,7 +25,8 @@ inputData =
 AllSearches =
     SELECT *
     FROM inputData
-    WHERE MajorBuildNumber == 22305
+    WHERE MajorBuildNumber >= 22306
+    AND CountryCode IN ("AU", "UK")
          ;
 
 Searches = SELECT DateId,

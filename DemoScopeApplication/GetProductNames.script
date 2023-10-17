@@ -5,19 +5,17 @@
 // Date Parameters
 #DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays(-3), DateTime.Parse("@@endDate@@"));
 
-#DECLARE inputStream string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/RelevanceScore/2022/11/AggregatedScoreFraud_2022_11_26.ss";
-#DECLARE outputStream string = @"/users/vijeetthomas/RelevanceScore/OtherProducts.ss";
-#DECLARE streamExpiryString string = "1";
-
-
+#DECLARE inputStream string = @"/users/harshalshree/GPT-SimilarProductSuggestions/CompleteAnalysisReport.ss";
+#DECLARE outputStream string = @"/users/harshalshree/GPT-SimilarProductSuggestions/CompleteAnalysisReportWithProductNames.ss";
+#DECLARE streamExpiryString string = "60";
+    
 input =
 SELECT *
 FROM
 (
     SSTREAM @inputStream
 )
-WHERE !(ProductGroupName.Equals("AppAndGame") || ProductGroupName.Equals("Win32") || ProductTypeName.Equals("TV Series") || ProductTypeName.Equals("Movie"))
-AND Market == "US";
+;
 
 #DECLARE productNameMapper string = @"/shares/asimov.prod.data/PublicPartner/Processed/ACE/Store/Catalog/DimSfaProduct.ss";
 productNames =
@@ -30,13 +28,11 @@ FROM
 output = 
     SELECT a.*, b.ProductName
     FROM input AS a 
-         INNER JOIN productNames AS b
+         LEFT JOIN productNames AS b
          ON a.ProductId == b.ProductId
     WHERE a.ProductId IS NOT NULL;
 
 
 OUTPUT output
 TO SSTREAM @outputStream
-CLUSTERED BY ProductId
-SORTED BY ProductId
 WITH STREAMEXPIRY @streamExpiryString;

@@ -1,0 +1,114 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:96d9fd4a-42cd-4669-8042-3ad39763bf8f
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -3), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate DateTime = @endDate;//.AddDays(-27);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+#DECLARE outputRoot string = @"users/vijeetthomas/AdsMetrics/";
+//#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/Optimus_Ads_SearchTerm_Analysis.ss", @outputRoot);
+#DECLARE outputTopStreamPerSearch string = string.Format("{0}/Optimus_Ads_Top10KSearchTerm_Analysis.ss", @outputRoot);
+#DECLARE rootFolder string = @"/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs/Search/TopSearchTerms";
+#DECLARE inputTop10KSearchTermsOverall string  = string.Format("{0}/{1:yyyy}/{1:MM}/Top10KSearchTermsOverall_{1:yyyy}_{1:MM}_{1:dd}.ss",@rootFolder,@endDate);
+
+#DECLARE streamExpiryString string = "60";
+
+#DECLARE inputDirectory string = "/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs";
+#DECLARE inputSearchProduct string = @"/Search/%Y/%m/SearchProduct_With_Flights_%Y_%m_%d.ss";
+
+BaseDataDaily =
+    SELECT *.Except(SearchTerm),
+           SearchTerm.ToLower().Trim() AS SearchTerm
+    FROM 
+    (
+        SSTREAM STREAMSET @inputDirectory
+                PATTERN @inputSearchProduct
+                RANGE __date = [@startDateString, @endDateString]
+    )
+    WHERE
+    (  SearchType == "Regular"
+       // OR (SearchType == "AutoSuggest" AND IsClicked == 1 AND !string.IsNullOrEmpty(PDP_ImpressionGuid))
+    )
+    AND !string.IsNullOrEmpty(SearchTerm)
+    //AND AppVersion.Split('.')[0] IN ("22305","22306","22307","22308","22309")
+    AND SearchSource == "search";
+
+AdViewsDaily =
+    SELECT //DateId,
+           SearchTerm,
+           COUNT(DISTINCT ImpressionGuid ) AS AdViews,
+           COUNT(DISTINCT CVRoot ) AS AdViewSessions
+    FROM BaseDataDaily
+    WHERE ContentSource IN ("Ad", "Ad_HCR");
+
+AdClicksDaily = 
+    SELECT  //DateId,
+            SearchTerm,
+            COUNT(DISTINCT ImpressionGuid) AS AdClicks,
+            COUNT(DISTINCT CVRoot ) AS AdClickSessions
+    FROM BaseDataDaily
+    WHERE IsClicked == 1
+    AND ContentSource IN ("Ad", "Ad_HCR");
+
+AdInstallsDaily =
+    SELECT //DateId,
+           SearchTerm,
+           COUNT(DISTINCT ImpressionGuid) AS AdGets,
+           COUNT(DISTINCT CVRoot ) AS AdGetSessions
+    FROM BaseDataDaily
+    WHERE IsAttemptedAcquisition > 0
+    AND ContentSource IN ("Ad", "Ad_HCR");
+
+AdSuccessfulInstallsDaily =
+    SELECT //DateId,
+           SearchTerm,
+           COUNT(DISTINCT ImpressionGuid) AS AdSuccessfulInstalls,
+           COUNT(DISTINCT CVRoot ) AS AdSuccessfulInstallSessions
+    FROM BaseDataDaily
+    WHERE IsSuccessfulAcquisition > 0
+    AND ContentSource IN ("Ad", "Ad_HCR");
+
+SearchSummary = 
+    SELECT a.*,
+           b.AdClicks,
+           b.AdClickSessions,
+           c.AdGets,
+           c.AdGetSessions,
+           d.AdSuccessfulInstalls,
+           d.AdSuccessfulInstallSessions,
+           (AdClicks * 100.0 / AdViews) AS CTRImpressions,
+           (AdGets * 100.0 / AdViewSessions) AS GetConversionImpressions,
+           (AdSuccessfulInstalls * 100.0 / AdViewSessions) AS SuccessfulConversionImpressions,
+           (AdClickSessions * 100.0 / AdViews) AS CTRSessions,
+           (AdGetSessions * 100.0 / AdViewSessions) AS GetConversionSessions,
+           (AdSuccessfulInstallSessions * 100.0 / AdViewSessions) AS SuccessfulConversionSessions
+    FROM AdViewsDaily AS a 
+         LEFT JOIN AdClicksDaily AS b 
+         ON //a.DateId == b.DateId AND 
+             a.SearchTerm == b.SearchTerm
+         LEFT JOIN AdInstallsDaily AS c 
+         ON //a.DateId == c.DateId AND 
+            a.SearchTerm == c.SearchTerm
+         LEFT JOIN AdSuccessfulInstallsDaily AS d 
+         ON //a.DateId == d.DateId AND 
+             a.SearchTerm == d.SearchTerm;
+
+TopSearchterms = SELECT SearchTerm FROM (SSTREAM @inputTop10KSearchTermsOverall);
+
+TopSearchTermsAds =
+    SELECT a.*
+    FROM SearchSummary AS a
+    INNER JOIN
+        TopSearchterms AS b
+        ON a.SearchTerm == b.SearchTerm;
+
+OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch
+CLUSTERED BY SearchTerm, AdViews
+SORTED BY AdViews DESC;
+
+OUTPUT TopSearchTermsAds TO SSTREAM @outputTopStreamPerSearch
+CLUSTERED BY SearchTerm, AdViews
+SORTED BY AdViews DESC;

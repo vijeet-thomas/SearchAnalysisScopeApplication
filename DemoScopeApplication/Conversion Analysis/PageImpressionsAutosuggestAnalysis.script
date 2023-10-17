@@ -7,15 +7,17 @@
 #DECLARE startDate1Day DateTime = @endDate.AddDays(-7);
 #DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
 #DECLARE startDate1DayString string = @startDate1Day.ToString("yyyy-MM-dd");
-#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_22305/July_24_Autosuggest";
+#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AppVer_Greater_22305/";
 #DECLARE outputStreamPerSearch string = string.Format("{0}/SFA_PageImpressions_AutoSuggestAnalysis.ss", @outputRoot);
 #DECLARE streamExpiryString string = "60";
-#DECLARE SFAView string = @"shares/asimov.prod.data/Public/Processed/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+#DECLARE SFAView string = @"/shares/DAP.Prod/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
 
 inputData =
     VIEW @SFAView 
     PARAMS 
     (
+        inputRootPath = "/shares/DAP.Prod",
+        uiNavigationPath =  "/UINavigation",
         startDate = @startDate1DayString,
         endDate = @endDateString
     );
@@ -23,7 +25,7 @@ inputData =
 AllSearches =
     SELECT *
     FROM inputData
-    WHERE MajorBuildNumber == 22305;
+    WHERE MajorBuildNumber >= 22305;
 
 Searches = SELECT DateId,
             COUNT (DISTINCT ImpressionGuid) AS SearchImpressions,
@@ -51,8 +53,7 @@ SearchSummary =
            (ClicksImpressions*100.0/SearchImpressions) AS CTRImpressions,
            (InstallsImpressions*100.0/SearchImpressions) AS ConversionImpressions,
            (ClicksSessions*100.0/SearchSessions) AS CTRSessions,
-           (InstallSessions*100.0/SearchSessions) AS ConversionSessions,
-           RANK() OVER(ORDER BY SearchImpressions DESC) AS RankBySearchCount 
+           (InstallSessions*100.0/SearchSessions) AS ConversionSessions
     FROM Searches AS a 
          INNER JOIN Clicks AS b 
             ON a.DateId == b.DateId

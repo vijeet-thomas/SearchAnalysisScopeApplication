@@ -1,0 +1,107 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:2ff16528-3520-427f-a8d7-cffea115d227
+// Used for tracking history
+
+
+#DECLARE endDate DateTime = IF("@@endDate@@".StartsWith("@@"), DateTime.UtcNow.AddDays( -10), DateTime.Parse("@@endDate@@"));
+#DECLARE startDate DateTime = @endDate.AddDays(-31);
+#DECLARE endDateString string = @endDate.ToString("yyyy-MM-dd");
+#DECLARE startDateString string = @startDate.ToString("yyyy-MM-dd");
+#DECLARE outputRoot string = @"users/vijeetthomas/AdsMetrics/October";
+//#DECLARE outputRoot string = @"users/vijeetthomas/ConversionAnalysis/AllAppVer/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/Optimus_Ads_Funnel.ss", @outputRoot);
+#DECLARE streamExpiryString string = "60";
+
+#DECLARE inputDirectory string = "/shares/asimov.prod.data/PublicPartner/Processed/MSOW/KPIs";
+#DECLARE inputSearchProduct string = @"/Search/%Y/%m/SearchProduct_With_Flights_%Y_%m_%d.ss";
+
+BaseDataDaily =
+    SELECT *.Except(SearchTerm),
+           SearchTerm.ToLower().Trim() AS SearchTerm
+    FROM
+    (
+        SSTREAM STREAMSET @inputDirectory
+                PATTERN @inputSearchProduct
+                RANGE __date = [@startDateString, @endDateString]
+    )
+    WHERE SearchType == "Regular"
+          AND SearchSource == "search"
+          AND !string.IsNullOrEmpty(SearchTerm);
+//AND ContentSource IN ("Ad", "Ad_HCR");
+
+SearchesDaily =
+    SELECT DateId,
+           COUNT(DISTINCT ImpressionGuid) AS Searches,
+           COUNT(DISTINCT CVRoot) AS SearchSessions
+    FROM BaseDataDaily;
+
+AdViewsDaily =
+    SELECT DateId,
+           COUNT(DISTINCT ImpressionGuid ) AS AdViews,
+           COUNT(DISTINCT CVRoot ) AS AdViewSessions
+    FROM BaseDataDaily
+    WHERE ContentSource IN ("Ad", "Ad_HCR")
+    ; //AND FlightName.Contains("enablePremiumSearch");
+
+AdClicksDaily =
+    SELECT DateId,
+           COUNT(DISTINCT ImpressionGuid) AS AdClicks,
+           COUNT(DISTINCT CVRoot) AS AdClickSessions
+    FROM BaseDataDaily
+    WHERE IsClicked == 1
+    AND ContentSource IN("Ad", "Ad_HCR");
+//AND FlightName.Contains("enablePremiumSearch");
+
+AdInstallsDaily =
+    SELECT DateId,
+           COUNT(DISTINCT ImpressionGuid) AS AdGets,
+           COUNT(DISTINCT CVRoot) AS AdGetSessions
+    FROM BaseDataDaily
+    WHERE IsAttemptedAcquisition > 0
+          AND ContentSource IN("Ad", "Ad_HCR");
+//AND FlightName.Contains("enablePremiumSearch");
+
+AdSuccessfulInstallsDaily =
+    SELECT DateId,
+           COUNT(DISTINCT ImpressionGuid) AS AdSuccessfulInstalls,
+           COUNT(DISTINCT CVRoot ) AS AdSuccessfulInstallSessions
+    FROM BaseDataDaily
+    WHERE IsSuccessfulAcquisition > 0
+    AND ContentSource IN ("Ad", "Ad_HCR")
+   ;// AND FlightName.Contains("enablePremiumSearch");
+
+SearchSummary = 
+    SELECT e.DateId,
+           e.Searches,
+           e.SearchSessions,
+           a.AdViews,
+           a.AdViewSessions,
+           b.AdClicks,
+           b.AdClickSessions,
+           c.AdGets,
+           c.AdGetSessions,
+           d.AdSuccessfulInstalls,
+           d.AdSuccessfulInstallSessions,
+           (AdViews*100.0/ Searches) AS AdPercentage,
+           (AdViewSessions*100.0/ SearchSessions) AS AdSessionPercentage,
+           (AdClicks * 100.0 / AdViews) AS CTRImpressions,
+           (AdGets * 100.0 / AdViewSessions) AS GetConversionImpressions,
+           (AdSuccessfulInstalls * 100.0 / AdViewSessions) AS SuccessfulConversionImpressions,
+           (AdGets * 100.0 / AdClicks) AS GetsByClicksImpressions,
+           (AdClickSessions * 100.0 / AdViews) AS CTRSessions,
+           (AdGetSessions * 100.0 / AdViewSessions) AS GetConversionSessions,
+           (AdSuccessfulInstallSessions * 100.0 / AdViewSessions) AS SuccessfulConversionSessions,
+           (AdGetSessions * 100.0 / AdClickSessions) AS GetsByClicksSessions
+    FROM SearchesDaily AS e
+         LEFT JOIN AdViewsDaily AS a 
+         ON a.DateId == e.DateId           
+         LEFT JOIN AdClicksDaily AS b 
+         ON a.DateId == b.DateId 
+         LEFT JOIN AdInstallsDaily AS c 
+         ON a.DateId == c.DateId
+         LEFT JOIN AdSuccessfulInstallsDaily AS d 
+         ON a.DateId == d.DateId;
+
+OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch
+CLUSTERED BY DateId
+SORTED BY DateId DESC;

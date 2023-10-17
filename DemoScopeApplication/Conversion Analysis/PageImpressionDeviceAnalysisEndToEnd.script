@@ -1,0 +1,72 @@
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Script GUID:1010a08a-4faa-4941-bb81-19d6f8b3d3e0
+// Used for tracking history
+
+#DECLARE firstDay DateTime = new DateTime(2023, 2, 1);
+#DECLARE lastDay DateTime = new DateTime(2023, 7, 31);
+#DECLARE firstDayString string = @firstDay.ToString("yyyy-MM-dd");
+#DECLARE lastDayString string = @lastDay.ToString("yyyy-MM-dd");
+
+#DECLARE outputRoot string = @"users/vijeetthomas/ConversionNumbers/";
+#DECLARE outputStreamPerSearch string = string.Format("{0}/SFA_PageImpressions_EndToEnd_DeviceBased_1stFeb_30thApr.ss", @outputRoot);
+#DECLARE streamExpiryString string = "60";
+#DECLARE SFAView string = @"/shares/DAP.Prod/UINavigation/Kpis/UniversalStoreInsights/SFA_PageImpressions/SFA_PageImpressions/SFA_PageImpressions.view";
+
+inputData =
+    VIEW @SFAView 
+    PARAMS 
+    (
+        inputRootPath = "/shares/DAP.Prod",
+        uiNavigationPath =  "/UINavigation",
+        startDate = @firstDayString,
+        endDate = @lastDayString
+    );
+
+AllSearches =
+    SELECT *,
+           DateId/100 AS YearMonth
+    FROM inputData;
+
+Searches = SELECT YearMonth,
+                  COUNT (DISTINCT DeviceId) AS DevicesThatSearched,
+                  COUNT (DISTINCT CVRoot) AS SearchSessions
+    FROM AllSearches
+    WHERE PageName == "searchPage" OR  Nav_CustomAttribute_2 == "AutoSuggest";
+                  
+Clicks = SELECT YearMonth,
+           COUNT (DISTINCT DeviceId) AS DevicesThatClicked,
+           COUNT (DISTINCT CVRoot) AS ClickSessions
+    FROM AllSearches
+    WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList") OR ( PageName == "pdp" AND Ref_AreaName == "AutoSuggest");
+
+Installs = SELECT YearMonth,
+                  COUNT (DISTINCT DeviceId) AS DevicesThatInstalled,
+                  COUNT (DISTINCT CVRoot) AS InstallSessions
+    FROM AllSearches
+    WHERE (  (
+                 (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList")  //Regular
+                  OR 
+                 (PageName == "pdp" AND Ref_AreaName == "AutoSuggest") //Autosuggest
+             ) 
+             AND (AttemptedAcquisitionCount > 0 OR InstallClicks > 0)  
+          ) ;
+         // OR (PageName == "searchPage" AND (ActionsContentId == "CallToActionButton" OR ActionsContentId == "CallToActionButton_Free") AND (AttemptedAcquisitionCount > 0 OR InstallClicks >0)); //Inline Install
+
+SearchSummary = 
+    SELECT a.*,
+           b.*.Except(YearMonth),
+           c.*.Except(YearMonth),
+           (DevicesThatClicked*100.0/DevicesThatSearched) AS CTRDevices,
+           (DevicesThatInstalled*100.0/DevicesThatSearched) AS ConversionDevices,
+           (ClickSessions*100.0/SearchSessions) AS CTRSessions,
+           (InstallSessions*100.0/SearchSessions) AS ConversionSessions
+    FROM Searches AS a 
+         INNER JOIN Clicks AS b 
+            ON a.YearMonth == b.YearMonth
+         INNER JOIN Installs AS c
+            ON a.YearMonth == c.YearMonth
+;
+
+OUTPUT SearchSummary TO SSTREAM @outputStreamPerSearch
+CLUSTERED BY YearMonth
+SORTED BY YearMonth DESC;

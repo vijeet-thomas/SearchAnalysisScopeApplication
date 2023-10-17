@@ -7,7 +7,7 @@
 
 #DECLARE inputFile string = @"shares/asimov.prod.data/PublicPartner/Processed/ACE/Search/Test/ProductId-NameMapping.csv";
 #DECLARE outputRoot string = @"users/vijeetthomas/GPT-AIEnrichedTermsAnalysis/";
-#DECLARE outputStreamPerSearch string = string.Format("{0}/ProductAnalysis_EndToEnd.ss", @outputRoot);
+#DECLARE outputStreamPerSearch string = string.Format("{0}/GPTAnalysis_EndToEnd.ss", @outputRoot);
 #DECLARE distinctoutputStream string = string.Format("{0}/DistinctProductIds.ss", @outputRoot);
 
 #DECLARE streamExpiryString string = "60";
@@ -36,13 +36,18 @@ BaseDataTreatment =
     FROM PIStream
     WHERE Flights.Contains("VAS_EXP_AiSearchTermV2") AND !Flights.Contains("VAS_EXP_AiSearchTermV2:false");
 
-ClicksT = SELECT ProductId,
+SearchesT = SELECT //DateId,
+           COUNT (DISTINCT ImpressionGuid) AS SearchImpressionsT
+    FROM BaseDataTreatment
+    WHERE PageName == "searchPage" OR  Nav_CustomAttribute_2 == "AutoSuggest";
+
+ClicksT = SELECT //ProductId,
            COUNT (DISTINCT ImpressionGuid) AS ClicksImpressionsT
     FROM BaseDataTreatment
     WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList") OR ( PageName == "pdp" AND Ref_AreaName == "AutoSuggest"); 
 
 InstallsT =
-    SELECT ProductId,
+    SELECT //ProductId,
            COUNT(DISTINCT ImpressionGuid) AS InstallsImpressionsT
     FROM BaseDataTreatment
     WHERE (
@@ -53,10 +58,13 @@ InstallsT =
 
 SearchSummaryTreatment =
     SELECT a.*,
-           b.*.Except(ProductId)
-    FROM ClicksT AS a 
-         LEFT JOIN InstallsT AS b 
-            ON a.ProductId == b.ProductId
+           b.*,//.Except(ProductId)
+           c.*
+    FROM SearchesT AS a
+        CROSS JOIN ClicksT AS b 
+         CROSS JOIN InstallsT AS c 
+            //ON a.ProductId == b.ProductId
+                    
 ;
 
 
@@ -67,13 +75,18 @@ BaseDataControl =
     FROM PIStream
     WHERE Flights.Contains("VAS_EXP_AiSearchTermV2:false");
 
-ClicksC = SELECT ProductId,
+SearchesC = SELECT //DateId,
+           COUNT (DISTINCT ImpressionGuid) AS SearchImpressionsC
+    FROM BaseDataControl
+    WHERE PageName == "searchPage" OR  Nav_CustomAttribute_2 == "AutoSuggest";
+
+ClicksC = SELECT //ProductId,
            COUNT (DISTINCT ImpressionGuid) AS ClicksImpressionsC
     FROM BaseDataControl
     WHERE (PageName == "pdp" AND Ref_PageName == "searchPage" AND Ref_AreaName == "SearchVerticalTileList") OR ( PageName == "pdp" AND Ref_AreaName == "AutoSuggest");
 
 InstallsC =
-    SELECT ProductId,
+    SELECT //ProductId,
            COUNT(DISTINCT ImpressionGuid) AS InstallsImpressionsC
     FROM BaseDataControl
     WHERE (
@@ -84,25 +97,31 @@ InstallsC =
 
 SearchSummaryControl =
     SELECT a.*,
-           b.*.Except(ProductId)
-    FROM ClicksC AS a
-         LEFT JOIN
-             InstallsC AS b
-         ON a.ProductId == b.ProductId;
+           b.*,//.Except(ProductId)
+           c.*
+    FROM SearchesC AS a
+    CROSS JOIN ClicksC AS b
+         CROSS JOIN
+             InstallsC AS c;
+         //ON a.ProductId == b.ProductId;
 
-FinalOverviewOutput = SELECT b.*, a.*.Except(ProductId) FROM SearchSummaryTreatment AS a OUTER JOIN SearchSummaryControl AS b ON a.ProductId == b.ProductId;
+FinalOverviewOutput = SELECT b.*,
+                             a.*//.Except(ProductId) 
+    FROM SearchSummaryTreatment AS a CROSS JOIN SearchSummaryControl AS b; // ON a.ProductId == b.ProductId;
 
-CountTotalDistinct = SELECT COUNT(DISTINCT ProductId) AS TotalDistinct FROM FinalOverviewOutput;
+OUTPUT FinalOverviewOutput TO SSTREAM @outputStreamPerSearch;
 
-FilteredData =
-    SELECT a.ProductId,
-           b.*.Except(ProductId)
-    FROM FilteredIds AS a
-         LEFT JOIN
-             FinalOverviewOutput AS b
-         ON a.ProductId == b.ProductId;
-
-
-OUTPUT FilteredData TO SSTREAM @outputStreamPerSearch
-CLUSTERED BY ProductId
-SORTED BY ProductId DESC;
+//CountTotalDistinct = SELECT COUNT(DISTINCT ProductId) AS TotalDistinct FROM FinalOverviewOutput;
+//
+//FilteredData =
+//    SELECT a.ProductId,
+//           b.*.Except(ProductId)
+//    FROM FilteredIds AS a
+//         LEFT JOIN
+//             FinalOverviewOutput AS b
+//         ON a.ProductId == b.ProductId;
+//
+//
+//OUTPUT FilteredData TO SSTREAM @outputStreamPerSearch
+//CLUSTERED BY ProductId
+//SORTED BY ProductId DESC;
